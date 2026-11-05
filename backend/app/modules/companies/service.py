@@ -1,6 +1,5 @@
-from typing import List, Optional
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+import uuid
+from typing import List
 
 from app.core.exceptions import (
     ConflictException,
@@ -9,11 +8,20 @@ from app.core.exceptions import (
 )
 from app.models.company import Company
 from app.models.user import User, UserRole
-from app.schemas.company import CompanyCreateRequest, CompanyUpdateRequest
+from app.schemas.company import CompanyCreateRequest, CompanyMemberGrantRequest, CompanyUpdateRequest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class CompaniesService:
     """Service handling company lifecycle, administration, and member listings."""
+
+    @staticmethod
+    def _require_company_admin(current_user: User) -> None:
+        if not current_user.company_id:
+            raise NotFoundException("User does not belong to any company")
+        if current_user.role != UserRole.ADMIN:
+            raise ForbiddenException("Only company administrators can manage company access")
 
     @staticmethod
     async def create_company(
@@ -113,11 +121,7 @@ class CompaniesService:
         Retrieve all member accounts belonging to the user's company.
         Restricted exclusively to company administrators.
         """
-        if not current_user.company_id:
-            raise NotFoundException("User does not belong to any company")
-
-        if current_user.role != UserRole.ADMIN:
-            raise ForbiddenException("Only company administrators can view company members")
+        CompaniesService._require_company_admin(current_user)
 
         result = await db.execute(
             select(User)
@@ -126,3 +130,42 @@ class CompaniesService:
         )
         members = result.scalars().all()
         return list(members)
+
+    @staticmethod
+    async def add_company_member(
+            db: AsyncSession,
+            current_user: User,
+            request: CompanyMemberGrantRequest,
+    ) -> User:
+        CompaniesService._require_company_admin(current_user)
+        result = await db.execute(
+            select(User).where(User.email == str(request.email).lower()).with_for_update()
+        )
+        member = result.scalar_one_or_none()
+        if member is None:
+            raise NotFoundException("A registered user with that email was not found")
+        if member.company_id is not None:
+            raise ConflictException("User already belongs to a company")
+        member.company_id = current_user.company_id
+        member.role = UserRole.RECRUITER
+        await db.commit()
+        await db.refresh(member)
+        return member
+
+    @staticmethod
+    async def remove_company_member(
+            db: AsyncSession,
+            current_user: User,
+            member_id: uuid.UUID,
+    ) -> None:
+        CompaniesService._require_company_admin(current_user)
+        result = await db.execute(
+            select(User).where(User.id == member_id, User.company_id == current_user.company_id)
+        )
+        member = result.scalar_one_or_none()
+        if member is None:
+            raise NotFoundException("Company member not found")
+        if member.role == UserRole.ADMIN:
+            raise ConflictException("Company administrators cannot be removed through member access management")
+        member.company_id = None
+        await db.commit()

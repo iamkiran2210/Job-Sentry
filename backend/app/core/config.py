@@ -1,4 +1,5 @@
 from typing import List, Union
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,6 +36,9 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+
+    # Optional import path in "package.module:factory" form for job requirement extraction.
+    AI_REQUIREMENTS_PROVIDER: str = ""
 
     # CORS
     ALLOWED_CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:5173"]

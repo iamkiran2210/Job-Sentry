@@ -1,8 +1,4 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.database import engine
@@ -15,8 +11,13 @@ from app.core.exceptions import (
 )
 from app.modules.auth.router import router as auth_router
 from app.modules.companies.router import router as companies_router
+from app.modules.jobs.router import router as jobs_router
 from app.modules.users.router import router as users_router
 from app.utils.responses import success_response
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 @asynccontextmanager
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
-    description="Job Sentry Backend API - Phase 1: Foundation, Authentication & Company Management",
+    description="Job Sentry Backend API - Foundation, Organizations & Recruitment Job Domain",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -62,6 +63,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(users_router, prefix=settings.API_V1_PREFIX)
 app.include_router(companies_router, prefix=settings.API_V1_PREFIX)
+app.include_router(jobs_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["Health"])

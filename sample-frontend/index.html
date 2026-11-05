@@ -111,6 +111,10 @@
       border-color: var(--primary);
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     .btn {
       background: var(--primary);
       color: white;
@@ -188,6 +192,19 @@
       margin-top: 0.5rem;
     }
 
+    .id-token-display {
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 180px;
+      margin-top: 0.75rem;
+    }
+
+    .token-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
     .conn-indicator {
       font-size: 0.8rem;
       font-weight: 600;
@@ -240,6 +257,18 @@
     <div class="google-btn-wrapper">
       <div id="googleButtonDiv"></div>
     </div>
+      <div id="idTokenPanel" class="form-group" aria-live="polite" hidden>
+          <div id="googleIdTokenLabel" class="token-label">Google ID token</div>
+          <p class="hint">This token is a credential. Keep it private and avoid sharing it.</p>
+          <pre id="googleIdTokenDisplay" class="id-token-display" aria-labelledby="googleIdTokenLabel" tabindex="0"
+               hidden></pre>
+          <div class="actions">
+              <button class="btn btn-outline" id="toggleIdTokenBtn" aria-controls="googleIdTokenDisplay"
+                      aria-expanded="false" onclick="toggleGoogleIdToken()">Show ID Token
+              </button>
+              <button class="btn btn-outline" id="copyIdTokenBtn" onclick="copyGoogleIdToken()">Copy ID Token</button>
+          </div>
+    </div>
   </div>
 
   <!-- Actions & Response Card -->
@@ -276,6 +305,8 @@
     accessToken: localStorage.getItem("access_token") || null,
     refreshToken: localStorage.getItem("refresh_token") || null
   };
+  let googleIdToken = null;
+  let googleIdTokenVisible = false;
 
   if (sessionTokens.accessToken) {
     enableSessionButtons(true);
@@ -313,6 +344,36 @@
     document.getElementById("meBtn").disabled = !enabled;
     document.getElementById("refreshBtn").disabled = !enabled;
     document.getElementById("logoutBtn").disabled = !enabled;
+  }
+
+  function setGoogleIdToken(token) {
+    googleIdToken = token;
+    googleIdTokenVisible = false;
+    document.getElementById("idTokenPanel").hidden = !token;
+    document.getElementById("googleIdTokenDisplay").textContent = token || "";
+    document.getElementById("googleIdTokenDisplay").hidden = true;
+    document.getElementById("toggleIdTokenBtn").textContent = "Show ID Token";
+    document.getElementById("toggleIdTokenBtn").setAttribute("aria-expanded", "false");
+  }
+
+  function toggleGoogleIdToken() {
+    if (!googleIdToken) return;
+    googleIdTokenVisible = !googleIdTokenVisible;
+    document.getElementById("googleIdTokenDisplay").hidden = !googleIdTokenVisible;
+    document.getElementById("toggleIdTokenBtn").textContent = googleIdTokenVisible
+      ? "Hide ID Token"
+      : "Show ID Token";
+    document.getElementById("toggleIdTokenBtn").setAttribute("aria-expanded", String(googleIdTokenVisible));
+  }
+
+  async function copyGoogleIdToken() {
+    if (!googleIdToken) return;
+    try {
+      await navigator.clipboard.writeText(googleIdToken);
+      log("Google ID token copied to clipboard.");
+    } catch (err) {
+      log(`Unable to copy Google ID token: ${err.message}`);
+    }
   }
 
   async function checkBackendHealth() {
@@ -387,6 +448,7 @@
     setBadge("ready", "Authenticating");
 
     const idToken = response.credential;
+    setGoogleIdToken(idToken);
 
     try {
       const res = await fetch(`${backendUrl}/api/v1/auth/google`, {
@@ -485,6 +547,7 @@
 
       sessionTokens.accessToken = null;
       sessionTokens.refreshToken = null;
+      setGoogleIdToken(null);
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       enableSessionButtons(false);

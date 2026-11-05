@@ -10,6 +10,8 @@ It is completely separate from the backend and has **zero impact** on the main c
 
 - **Google Identity Services Integration:** Renders the official Google Sign-In button using `https://accounts.google.com/gsi/client`.
 - **Backend Flow Verification:** Captures the Google ID token and automatically calls `POST /api/v1/auth/google`.
+- **Google ID Token Inspection:** Shows the received ID token on demand and provides a copy button; the token is cleared
+  on logout.
 - **Session Management:** Stores and displays the received `access_token` and `refresh_token`.
 - **Interactive Verification Buttons:**
   - **Test `/auth/me`**: Calls the protected endpoint with the Bearer access token.
