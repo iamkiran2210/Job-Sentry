@@ -1,0 +1,129 @@
+import hashlib
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
+
+import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
+
+from app.core.config import settings
+from app.core.exceptions import UnauthorizedException
+
+# Argon2 password hasher instance
+pwd_hasher = PasswordHasher()
+
+
+def hash_password(password: str) -> str:
+    """Hash a plaintext password using Argon2."""
+    return pwd_hasher.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plaintext password against an Argon2 hash."""
+    if not hashed_password:
+        return False
+    try:
+        return pwd_hasher.verify(hashed_password, plain_password)
+    except (VerifyMismatchError, InvalidHashError):
+        return False
+
+
+def hash_token(token: str) -> str:
+    """Hash a token using SHA-256 for secure persistent storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_access_token(
+    subject: str,
+    role: str,
+    company_id: Optional[str] = None,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """
+    Generate a signed JWT access token.
+    Contains subject, role, company_id, token type, and expiration.
+    """
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    payload = {
+        "sub": str(subject),
+        "role": role,
+        "company_id": str(company_id) if company_id else None,
+        "type": "access",
+        "jti": uuid.uuid4().hex,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+def create_refresh_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+) -> tuple[str, datetime]:
+    """
+    Generate a signed JWT refresh token.
+    Returns (token_str, expiry_datetime_utc).
+    """
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    payload = {
+        "sub": str(subject),
+        "type": "refresh",
+        "jti": uuid.uuid4().hex,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
+    }
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return token, expire
+
+
+def decode_token(token: str) -> Dict[str, Any]:
+    """
+    Decode and validate a JWT token's signature and expiration.
+    Raises UnauthorizedException on failure.
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"require": ["exp", "sub", "type"]},
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise UnauthorizedException("Token has expired")
+    except jwt.InvalidTokenError as e:
+        raise UnauthorizedException(f"Invalid token: {str(e)}")
+
+
+def verify_google_id_token(token: str) -> Dict[str, Any]:
+    """
+    Verify Google ID token using Google's official library.
+    Validates audience, issuer, and expiration.
+    """
+    try:
+        request = google_requests.Request()
+        audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
+        id_info = id_token.verify_oauth2_token(token, request, audience=audience)
+
+        issuer = id_info.get("iss")
+        if issuer not in ["accounts.google.com", "https://accounts.google.com"]:
+            raise UnauthorizedException("Invalid Google token issuer")
+
+        return id_info
+    except ValueError as e:
+        raise UnauthorizedException(f"Invalid Google ID token: {str(e)}")
+    except Exception as e:
+        raise UnauthorizedException(f"Google token verification failed: {str(e)}")

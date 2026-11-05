@@ -1,0 +1,77 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.core.config import settings
+from app.core.database import engine
+from app.core.exceptions import (
+    AppException,
+    app_exception_handler,
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
+from app.modules.auth.router import router as auth_router
+from app.modules.companies.router import router as companies_router
+from app.modules.users.router import router as users_router
+from app.utils.responses import success_response
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context for managing startup and shutdown."""
+    # Startup: connection verification
+    yield
+    # Shutdown: clean up database connections
+    await engine.dispose()
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="1.0.0",
+    description="Job Sentry Backend API - Phase 1: Foundation, Authentication & Company Management",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
+
+# CORS Middleware
+origins = settings.ALLOWED_CORS_ORIGINS
+if isinstance(origins, str):
+    origins = [origins]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Exception Handlers
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
+
+# Register Routers
+app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
+app.include_router(users_router, prefix=settings.API_V1_PREFIX)
+app.include_router(companies_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Service health check endpoint."""
+    return success_response(
+        data={
+            "app": settings.APP_NAME,
+            "environment": settings.ENVIRONMENT,
+            "status": "healthy",
+        },
+        message="Service is operational",
+    )
