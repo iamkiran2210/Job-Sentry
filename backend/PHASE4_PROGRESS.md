@@ -40,3 +40,8 @@ Added a table-driven verification suite covering email, phone, completeness thre
 Verification now uses E.164 normalization, configured thresholds and duplicate scope, neutral timeline gaps, explicit URL result codes, host/DNS revalidation, bounded redirects, and disabled-check `not_verified` results.
 Fixed defects found by the matrix: multiple emails were missed by an anchored regex, and alphabetic-only phone input was incorrectly reported as missing region.
 Validation: E2 matrix — 58 passed; full candidate-intelligence suite — 145 passed in 34.60s. HTTP requests were exercised through `httpx.MockTransport` and an injected resolver.
+
+## E3 scoring goldens and guardrail tests (2026-11-08)
+Added deterministic E-I golden cases, mandatory evidence trust tests, protected-attribute filtering, mocked prompt injection, and LLM timeout/schema failure cases; a service-backed test checks persisted experience/project values against hand-computed Decimals.
+Fixed relevance-only experience results to record `partial_experience_evidence`, recognized rule-based evidence for mandatory requirements, and marked zero known projects with `fewer_than_n_projects`.
+Validation: focused E3 file — 20 passed; full candidate-intelligence suite — 165 passed in 33.92s against disposable `job_sentry_test`.

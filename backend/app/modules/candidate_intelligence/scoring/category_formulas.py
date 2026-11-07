@@ -7,6 +7,15 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 D = Decimal
+CATEGORIES = ("skills", "experience", "projects", "education", "certifications")
+
+
+def validate_weights(weights: dict[str, Decimal | float | str]) -> dict[str, Decimal]:
+    """Return stable Decimal weights or reject an invalid scoring configuration."""
+    converted = {key: D(str(value)) for key, value in sorted(weights.items())}
+    if tuple(sorted(converted)) != tuple(sorted(CATEGORIES)) or any(value < 0 for value in converted.values()) or sum(converted.values(), D(0)) != D("1"):
+        raise ValueError("Category weights must contain all categories, be non-negative and sum to 1.0")
+    return converted
 
 
 @dataclass(frozen=True)
@@ -31,6 +40,29 @@ class AggregateResult:
     review_signals: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class MandatoryEvaluation:
+    results: tuple[dict, ...]
+    eligibility: str
+    review_signals: tuple[str, ...]
+
+
+def evaluate_mandatory(requirements: list[dict], evidence_rows: list) -> MandatoryEvaluation:
+    results = []
+    trusted = {"exact_skill_match", "alias_skill_match", "exact", "alias", "rule", "rule_based_match"}
+    for req in sorted((r for r in requirements if r.get("is_mandatory") or r.get("requirement_type") == "mandatory"), key=lambda r: str(r.get("id", ""))):
+        name = str(req.get("name", "")).casefold()
+        related = [e for e in evidence_rows if getattr(e, "value", None) is not None and str(getattr(e, "requirement_term", "")).casefold() == name]
+        met = [e for e in related if getattr(e, "signal_type", "") in trusted]
+        known = [e for e in evidence_rows if getattr(e, "category", None) == req.get("category") and getattr(e, "value", None) is not None]
+        status = "met" if met else "not_met" if known else "unknown"
+        results.append({"requirement_id": str(req.get("id", name)), "status": status, "evidence_ids": sorted(str(e.evidence_id) for e in met)})
+    statuses = {r["status"] for r in results}
+    eligibility = "potentially_ineligible" if "not_met" in statuses else "needs_review" if "unknown" in statuses else "eligible"
+    signals = tuple(x for x in ("mandatory_not_met" if "not_met" in statuses else None, "mandatory_unknown" if "unknown" in statuses else None) if x)
+    return MandatoryEvaluation(tuple(results), eligibility, signals)
+
+
 def aggregate(categories: list[CategoryResult], mandatory_results: list[dict], completeness_threshold: Decimal = D("0.60")) -> AggregateResult:
     """Aggregate category results with fixed Decimal arithmetic."""
     ordered = sorted(categories, key=lambda c: c.category)
@@ -53,7 +85,8 @@ def aggregate(categories: list[CategoryResult], mandatory_results: list[dict], c
 
 
 def _result(category, match, weight, components=None, evidence=(), notes=(), status=None):
-    q = D(str(match)).quantize(D("0.0001"), rounding=ROUND_HALF_UP) if match is not None else None
+    raw = D(str(match)) if match is not None else None
+    q = max(D(0), min(D(1), raw)).quantize(D("0.0001"), rounding=ROUND_HALF_UP) if raw is not None else None
     state = status or ("known" if q is not None else "unknown")
     contribution = q * D(str(weight)) if q is not None else None
     return CategoryResult(category, state, q, D(str(weight)), contribution, components or {}, tuple(sorted(evidence)), tuple(sorted(set(notes))))
@@ -69,7 +102,7 @@ def skills_result(requirements: list[dict], credits: dict[str, tuple[Decimal | N
         if credit is None:
             continue
         rw = D(2) if req.get("is_mandatory") or req.get("requirement_type") == "mandatory" else D(1)
-        numerator += rw * D(credit); denominator += rw
+        numerator += rw * max(D(0), min(D(1), D(credit))); denominator += rw
         if evidence_id: used.append(evidence_id)
     if not denominator:
         return _result("skills", None, weight, {"requirements_known": 0}, status="unknown")
@@ -103,23 +136,31 @@ def merged_relevant_years(entries: list[dict], relevances: dict[str, Decimal | N
 
 
 def experience_result(entries: list[dict], relevance: dict[str, Decimal | None], required_years: Decimal | None, as_of: date, weight: Decimal, years_component_weight: Decimal = D("0.5"), relevance_min: Decimal = D("0.25")) -> CategoryResult:
+    if not entries:
+        return _result("experience", None, weight, {"years_fit": None, "relevance": None, "relevant_years": None, "required_years": required_years})
     known_rel = [(str(x.get("id", "")), D(relevance[str(x.get("id", ""))])) for x in entries if relevance.get(str(x.get("id", ""))) is not None]
     rel_score = sum((r for _, r in known_rel), D(0))/len(known_rel) if known_rel else None
     years_fit = None; years = None
-    if required_years is not None and D(required_years) > 0:
+    if required_years is not None and D(required_years) > 0 and known_rel:
         years = merged_relevant_years(entries, relevance, as_of, relevance_min)
         years_fit = min(years/D(required_years), D(1))
     if years_fit is None and rel_score is None: return _result("experience", None, weight, {"years_fit": None, "relevance": None, "relevant_years": years, "required_years": required_years})
     notes = []
-    if years_fit is None: match = rel_score
-    elif rel_score is None: match = years_fit; notes.append("partial_experience_evidence")
-    else: match = years_component_weight*years_fit + (D(1)-years_component_weight)*rel_score
+    if years_fit is None:
+        match = rel_score
+        if rel_score is not None:
+            notes.append("partial_experience_evidence")
+    elif rel_score is None:
+        match = years_fit
+        notes.append("partial_experience_evidence")
+    else:
+        match = years_component_weight*years_fit + (D(1)-years_component_weight)*rel_score
     return _result("experience", match, weight, {"years_fit": years_fit, "relevance": rel_score, "relevant_years": years, "required_years": required_years}, [i for i, _ in known_rel], notes)
 
 
 def projects_result(projects: list[dict], relevance: dict[str, Decimal | None], weight: Decimal, top_n: int = 3) -> CategoryResult:
     known = sorted(((D(relevance[str(p.get("id", ""))]), str(p.get("id", ""))) for p in projects if relevance.get(str(p.get("id", ""))) is not None), key=lambda x: (-x[0], x[1]))[:top_n]
-    if not known: return _result("projects", None, weight, {"top_n_used": 0, "mean": None, "ids_used": []})
+    if not known: return _result("projects", None, weight, {"top_n_used": 0, "mean": None, "ids_used": []}, notes=("fewer_than_n_projects",))
     mean = sum((v for v, _ in known), D(0))/len(known)
     notes = ("fewer_than_n_projects",) if len(known) < top_n else ()
     return _result("projects", mean, weight, {"top_n_used": len(known), "mean": mean, "ids_used": [i for _, i in known]}, [i for _, i in known], notes)
@@ -129,7 +170,9 @@ def education_result(degrees: list[str], required: str | None, level_map: dict[s
     if required is None: return _result("education", None, weight, status="not_applicable")
     norm = lambda x: "".join(ch for ch in x.casefold() if ch.isalnum())
     levels = {norm(k): int(v) for k, v in level_map.items()}
-    req_level = levels.get(norm(required)); cand = [levels[norm(x)] for x in degrees if norm(x) in levels]
+    aliases = {"btech": "bachelor", "be": "bachelor", "bsc": "bachelor", "ba": "bachelor", "beng": "bachelor", "mtech": "master", "ms": "master", "msc": "master", "mba": "master", "meng": "master", "phd": "doctorate", "phddegree": "doctorate"}
+    resolve = lambda value: levels.get(aliases.get(norm(value), norm(value)))
+    req_level = resolve(required); cand = [level for x in degrees if (level := resolve(x)) is not None]
     if req_level is None: return _result("education", None, weight, {"required_level": None}, notes=("unrecognized_degree",))
     if not cand: return _result("education", None, weight, {"required_level": req_level}, notes=("unrecognized_degree",) if degrees else ())
     gap = max(cand)-req_level
@@ -151,7 +194,8 @@ def certifications_result(required: list[dict], held: list[dict], aliases: dict[
             notes.append("cert_expired"); continue
         if not cert.get("expiry_date"): notes.append("cert_expiry_unknown")
         candidates[canon(name)] = cert
-    if not candidates: return _result("certifications", None, weight, {"requirements_known": 0}, notes=notes)
+    if not held:
+        return _result("certifications", None, weight, {"requirements_known": 0}, notes=notes)
     numerator = denominator = D(0); used = []
     for req in sorted(required, key=lambda r: str(r.get("id", r.get("name", "")))):
         rw = D(2) if req.get("is_mandatory") or req.get("requirement_type") == "mandatory" else D(1)
