@@ -76,3 +76,8 @@ Validation: endpoint and verification contracts remain covered by named tests; f
 Replaced stale audit/closure text with test-backed implementation and acceptance matrices; each done row names a passing test and file, and the remaining AI/lint rows state their blockers.
 Expanded the service-backed E-I golden to persist skills rounding, merged experience, projects, education, certifications, and the hand-computed aggregate; focused E-I tests passed 20 cases.
 Validation: matrix counts 33 done / 2 NOT VERIFIED; full candidate-intelligence suite — 192 passed in 47.67s against disposable `job_sentry_test`.
+
+## E10 final verification (2026-11-08)
+Final candidate-intelligence suite — 192 passed in 47.23s; `scripts/alembic_test.sh heads` shows one head, `a91d6e4f2b70`; a fresh throwaway DB upgraded and `scripts/alembic_test.sh check` reported no new operations.
+The PostgreSQL downgrade/upgrade round trip and Phase 1–3 row survival test passed; `rg` found score/category assignments only in ranking-history persistence and scoring persistence, with no removed old-path function matches.
+E7 remains NOT VERIFIED because the AI directory cannot collect without an offline PyMuPDF wheel; no lint/type tools are declared. The final worktree and uncommitted baseline files are listed in the completion report.
