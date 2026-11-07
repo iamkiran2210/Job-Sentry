@@ -217,7 +217,7 @@ class CandidateIntelligenceService:
         requirements_snapshot = [{"id": str(r.id), "category": str(r.category.value if hasattr(r.category,"value") else r.category), "name": r.name, "type": str(r.requirement_type.value if hasattr(r.requirement_type,"value") else r.requirement_type), "is_mandatory": r.is_mandatory, "weight": r.weight} for r in reqs]
         requirement_hash = hashlib.sha256(json.dumps(requirements_snapshot, sort_keys=True).encode()).hexdigest()
         config_snapshot = {"scoring_version": cfg.scoring_version, "algorithm_version": cfg.algorithm_version,
-                           "weights": {c: getattr(cfg, f"weight_{c}") for c in CATEGORIES},
+                           "weights": {c: getattr(cfg, f"weight_{c}") for c in formulas.CATEGORIES},
                            "semantic_min": cfg.semantic_min, "semantic_full": cfg.semantic_full,
                            "semantic_credit_cap": cfg.semantic_credit_cap,
                            "low_completeness_threshold": cfg.low_completeness_threshold,

@@ -45,3 +45,8 @@ Validation: E2 matrix — 58 passed; full candidate-intelligence suite — 145 p
 Added deterministic E-I golden cases, mandatory evidence trust tests, protected-attribute filtering, mocked prompt injection, and LLM timeout/schema failure cases; a service-backed test checks persisted experience/project values against hand-computed Decimals.
 Fixed relevance-only experience results to record `partial_experience_evidence`, recognized rule-based evidence for mandatory requirements, and marked zero known projects with `fewer_than_n_projects`.
 Validation: focused E3 file — 20 passed; full candidate-intelligence suite — 165 passed in 33.92s against disposable `job_sentry_test`.
+
+## E4 ranking tests (2026-11-08)
+Added isolated rank tie-break tests, deterministic shuffled-input and contiguous rank checks, 25-row filter-before-pagination coverage, and a DB-backed rank-run provenance/repeatability/job-scope test.
+Fixed ranking config snapshot construction to reference the scorer's exported category list; run metadata captures config/provider versions, tie keys, eligibility, and verification states.
+Validation: ranking goldens — 9 passed; full candidate-intelligence suite — 174 passed in 34.73s against disposable `job_sentry_test`.
