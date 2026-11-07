@@ -190,7 +190,7 @@ async def test_llm_timeout_and_schema_failure_become_unknown_with_error(failure,
 
 
 @pytest.mark.asyncio
-async def test_service_persists_hand_computed_experience_and_project_goldens(db_session, company_with_admin, monkeypatch):
+async def test_service_persists_hand_computed_category_goldens_e_to_i(db_session, company_with_admin, monkeypatch):
     from app.ai_features.models.application import Application
     from app.ai_features.models.extracted_profile import ExtractedProfile
     from app.ai_features.models.resume import Resume
@@ -209,19 +209,24 @@ async def test_service_persists_hand_computed_experience_and_project_goldens(db_
     resume = Resume(company_id=company.id, job_id=job.id, application_id=app.id, original_filename="resume.pdf", extension="pdf", content_type="application/pdf", size_bytes=10, sha256="a" * 64, storage_backend="local", storage_key="test/golden.pdf")
     db_session.add(resume)
     await db_session.flush()
-    profile = {"skills": [], "employment": [
+    profile = {"skills": [{"id": "s1", "name": "Python"}], "employment": [
         {"id": "e1", "title": "Engineer", "start_date": "2020-01", "end_date": "2022-12"},
         {"id": "e2", "title": "Engineer", "start_date": "2022-01", "end_date": "2023-12"}],
         "projects": [{"id": "p1", "name": "API"}, {"id": "p2", "name": "Service"}],
-        "education": [], "certifications": []}
+        "education": [{"id": "ed1", "degree": "bachelor"}],
+        "certifications": [{"id": "c1", "name": "AWS", "expiry_date": "2027-01"}]}
     db_session.add(ExtractedProfile(company_id=company.id, resume_id=resume.id, source_text="Engineer built APIs. Service project.", profile_data=profile))
     db_session.add_all([
+        JobRequirement(job_id=job.id, category=RequirementCategory.SKILLS, name="Python", requirement_type=RequirementType.PREFERRED, importance=RequirementImportance.MEDIUM, weight=1.0, is_mandatory=False),
         JobRequirement(job_id=job.id, category=RequirementCategory.EXPERIENCE, name="5 years backend", requirement_type=RequirementType.PREFERRED, importance=RequirementImportance.MEDIUM, weight=1.0, is_mandatory=False),
         JobRequirement(job_id=job.id, category=RequirementCategory.RESPONSIBILITY, name="API projects", requirement_type=RequirementType.PREFERRED, importance=RequirementImportance.MEDIUM, weight=1.0, is_mandatory=False),
+        JobRequirement(job_id=job.id, category=RequirementCategory.EDUCATION, name="bachelor", requirement_type=RequirementType.PREFERRED, importance=RequirementImportance.MEDIUM, weight=1.0, is_mandatory=False),
+        JobRequirement(job_id=job.id, category=RequirementCategory.CERTIFICATION, name="AWS", requirement_type=RequirementType.PREFERRED, importance=RequirementImportance.MEDIUM, weight=1.0, is_mandatory=False),
     ])
     await db_session.flush()
     async def fixed_evidence(inputs, cfg):
         return [
+            ScoreEvidence("skill-rounding", "skills", "exact_skill_match", .12345, matched_term="Python", requirement_term="Python", canonical_term="python", match_type="exact"),
             ScoreEvidence("exp-e1", "experience", "llm_relevance", .6, source_location="experience:e1", llm_model="stub", prompt_version="p1", input_hash="a" * 64),
             ScoreEvidence("exp-e2", "experience", "llm_relevance", .8, source_location="experience:e2", llm_model="stub", prompt_version="p1", input_hash="b" * 64),
             ScoreEvidence("proj-p1", "projects", "llm_relevance", .4, source_location="projects:p1", llm_model="stub", prompt_version="p1", input_hash="c" * 64),
@@ -232,4 +237,7 @@ async def test_service_persists_hand_computed_experience_and_project_goldens(db_
     assert persisted.category_detail["experience"]["match"] == "0.7500"
     assert persisted.category_detail["experience"]["components"]["relevant_years"] == "4"
     assert persisted.category_detail["projects"]["match"] == "0.6000"
-    assert persisted.score == D("68.33")
+    assert persisted.category_detail["skills"]["match"] == "0.1235"
+    assert persisted.category_detail["education"]["match"] == "1.0000"
+    assert persisted.category_detail["certifications"]["match"] == "1.0000"
+    assert (persisted.score, persisted.data_completeness, persisted.score_lower_bound, persisted.score_upper_bound) == (D("50.69"), D("1.000"), D("50.69"), D("50.69"))

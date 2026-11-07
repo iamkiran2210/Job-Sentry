@@ -71,3 +71,8 @@ Resume from E7 when PyMuPDF can be provided offline, then rerun the AI directory
 Rewrote the module README with architecture, category formulas, Decimal rounding, missing-data/bounds behavior, verification matrix, ranking provenance/lock behavior, schema/version guidance, safe migration workflow, limitations and responsible use.
 Added `API.md` documenting all five endpoints, request/response examples, filters, status/error contracts and authorization behavior.
 Validation: endpoint and verification contracts remain covered by named tests; full candidate-intelligence suite — 192 passed in 48.52s against disposable `job_sentry_test`.
+
+## E9 matrix and acceptance (2026-11-08)
+Replaced stale audit/closure text with test-backed implementation and acceptance matrices; each done row names a passing test and file, and the remaining AI/lint rows state their blockers.
+Expanded the service-backed E-I golden to persist skills rounding, merged experience, projects, education, certifications, and the hand-computed aggregate; focused E-I tests passed 20 cases.
+Validation: matrix counts 33 done / 2 NOT VERIFIED; full candidate-intelligence suite — 192 passed in 47.67s against disposable `job_sentry_test`.
