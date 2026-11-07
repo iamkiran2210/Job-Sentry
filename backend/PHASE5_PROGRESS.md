@@ -23,3 +23,8 @@ Validation: full suite — 360 passed, 2 skipped in 135.62s.
 Google ID-token verification now masks provider exception text from 401 responses and logs only the exception type; malformed CORS JSON catches `JSONDecodeError`, and the audit distinguishes rollback-and-reraise cleanup from swallowed errors.
 Regression: `tests/test_security_exception_safety.py::test_google_token_errors_do_not_expose_provider_details` — 2 parameter cases pass.
 Validation: full suite — 362 passed, 2 skipped in 138.47s. An auth subset run without PostgreSQL stalled in the SQLite fixture and was interrupted; it is not counted as passing evidence.
+
+## F1 blocking calls (2026-11-08)
+Synchronous embedding provider work in asynchronous scoring now runs in Starlette's thread pool; the provider Protocol remains synchronous for simple mocks and CPU-bound implementations.
+Regression: `tests/candidate_intelligence/test_nonblocking_embedding.py::test_sync_embedding_does_not_block_the_event_loop` passes after first failing against the blocking implementation.
+Validation: full suite — 363 passed, 2 skipped in 133.09s.

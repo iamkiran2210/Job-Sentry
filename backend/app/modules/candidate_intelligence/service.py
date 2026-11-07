@@ -8,6 +8,7 @@ from decimal import Decimal
 from collections.abc import Mapping
 
 from fastapi import HTTPException
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -424,7 +425,7 @@ class ScoringService:
             for requirement in skill_reqs:
                 try:
                     from dataclasses import replace
-                    sem = semantic_evidence(requirement, claim, embedder, cfg.semantic_min, cfg.semantic_model_version, "skills", cfg.semantic_full, cfg.semantic_credit_cap)
+                    sem = await run_in_threadpool(semantic_evidence, requirement, claim, embedder, cfg.semantic_min, cfg.semantic_model_version, "skills", cfg.semantic_full, cfg.semantic_credit_cap)
                     evidence.append(replace(sem, source_location=f"skills:{item['id']}"))
                 except Exception:
                     pass
@@ -437,7 +438,7 @@ class ScoringService:
                     continue
                 for requirement in reqs:
                     try:
-                        sem = semantic_evidence(requirement, claim, embedder, cfg.semantic_min, cfg.semantic_model_version, category, cfg.semantic_full, cfg.semantic_credit_cap)
+                        sem = await run_in_threadpool(semantic_evidence, requirement, claim, embedder, cfg.semantic_min, cfg.semantic_model_version, category, cfg.semantic_full, cfg.semantic_credit_cap)
                         from dataclasses import replace
                         sem_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{sem.evidence_id}:{category}:{item_id}"))
                         evidence.append(replace(sem, evidence_id=sem_id, source_location=f"{category}:{item_id}"))
