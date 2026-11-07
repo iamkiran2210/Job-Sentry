@@ -13,3 +13,8 @@ Validation: full suite — 360 passed, 2 skipped in 127.76s.
 Removed confirmed unused imports from `app/core/dependencies.py`, auth router/service, and candidate-intelligence models/service; relationship-registration imports were preserved.
 The custom AST import scan was a screening aid only; complete dead-code detection remains NOT VERIFIED until Ruff/vulture are available offline.
 Validation: full suite — 360 passed, 2 skipped in 129.54s.
+
+## F1 timezone audit (2026-11-08)
+Reviewed all `datetime.now`/`utcnow`/`fromtimestamp` calls, mapped `DateTime` columns and migrations; clocks are UTC-aware and mapped timestamps use timezone-aware columns, so no code or migration change was needed.
+Corrected the audit: the resume `as_utc` helper re-exports the shared clock and is not a duplicate clock implementation.
+Validation: full suite — 360 passed, 2 skipped in 135.62s.

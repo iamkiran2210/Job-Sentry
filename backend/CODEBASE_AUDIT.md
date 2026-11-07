@@ -7,7 +7,7 @@ This inventory is based on source inspection and repository searches on 2026-11-
 | `backend/pyproject.toml:30` | tooling | medium | Add Ruff and strict mypy to the dev group; configure scoped checks. `vulture`, `pip-audit`, `detect-secrets`, and `gitleaks` are unavailable offline. |
 | `backend/app/**` | unused imports / dead code | medium | A local AST scan found and removed confirmed unused imports in the shared dependency, auth, and candidate-intelligence modules. ORM imports used for relationship registration were retained. Dead-code detection remains NOT VERIFIED because vulture and Ruff are unavailable offline. |
 | `backend/app/**` | circular imports | low | NOT VERIFIED: no import-graph analyzer is installed; full tests and module imports pass, which is not a cycle audit. |
-| `backend/app/models/base.py:9` and `backend/app/ai_features/resumes/timeutil.py` | duplicate utility | low | Consolidate the separate UTC clock helpers if the AI feature tree is brought into the maintained package scope. Both currently return aware UTC values. |
+| `backend/app/models/base.py:9` and `backend/app/ai_features/resumes/timeutil.py:5` | duplicate utility | low | No duplicate clock implementation: `timeutil` re-exports the shared `utc_now` helper. Keep that single implementation. |
 | `backend/app/core/security.py:128` | broad exception | medium | Narrow token-verification failures and preserve generic client errors; add safe logging. |
 | `backend/app/core/database.py:60` | swallowed exception | medium | Review the broad cleanup catch; log or handle only expected disposal errors. |
 | `backend/app/core/config.py:61` | broad exception | low | Narrow configuration parsing fallback and record the invalid setting without exposing secrets. |
