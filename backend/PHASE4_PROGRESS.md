@@ -34,3 +34,9 @@ Added revision `f4a1b2c3d5e6` after immutable `e82c4a91d307`; it adds evidence m
 Added Alembic-backed tests for category/signal allowlists, value and cosine ranges, proof/grounding rules, required semantic/LLM/exact metadata, source offsets, valid signal rows, and all evidence fields as columns.
 Fixed semantic credit to persist zero below threshold, populated model/prompt/embedding metadata, and added pgvector list/string conversion for asyncpg.
 Validation: focused evidence tests — 33 passed; Alembic migration round trip — 1 passed; full suite — 87 passed in 29.84s.
+
+## E2 verification matrix tests (2026-11-08)
+Added a table-driven verification suite covering email, phone, completeness thresholds, timelines, duplicate scope, URLs/SSRF/redirects, precedence, normalization, privacy logging, and the verify-response disclaimer.
+Verification now uses E.164 normalization, configured thresholds and duplicate scope, neutral timeline gaps, explicit URL result codes, host/DNS revalidation, bounded redirects, and disabled-check `not_verified` results.
+Fixed defects found by the matrix: multiple emails were missed by an anchored regex, and alphabetic-only phone input was incorrectly reported as missing region.
+Validation: E2 matrix — 58 passed; full candidate-intelligence suite — 145 passed in 34.60s. HTTP requests were exercised through `httpx.MockTransport` and an injected resolver.

@@ -134,21 +134,27 @@ class CandidateIntelligenceService:
             existing.append({
                 "company_id": str(other.company_id),
                 "application_id": str(other.id),
+                "job_id": str(other.job_id),
                 "email": other_candidate.normalized_email or other_candidate.email if other_candidate else None,
                 "phone": other_candidate.normalized_phone or other_candidate.phone if other_candidate else None,
                 "resume_hash": other_resume.sha256 if other_resume else None,
             })
         # Include candidate identity claims without exposing them to any score inputs.
         cfg = get_intelligence_settings()
-        result_set = [email_check(email), phone_check(phone, cfg.phone_region),
+        result_set = [email_check(email, cfg.email_check_enabled), phone_check(phone, cfg.phone_region),
                       completeness_check(profile, profile_row.source_text if profile_row else None,
                                          cfg.completeness_review_threshold, cfg.completeness_fail_threshold),
-                      timeline_check(profile.get("employment") or [], date.today()),
-                      duplicate_signals(email, phone, resume.sha256 if resume else None, existing, str(app.company_id))]
+                      timeline_check(profile.get("employment") or [], date.today(),
+                                     cfg.timeline_overlap_tolerance_months, cfg.timeline_gap_threshold_months),
+                      duplicate_signals(email, phone, resume.sha256 if resume else None, existing, str(app.company_id),
+                                        scope=cfg.duplicate_scope, job_id=str(app.job_id), phone_region=cfg.phone_region)]
         for key in ("github_url", "portfolio_url"):
             value = ((contact.get(key) or {}).get("value"))
             checker = github_url_check if key == "github_url" else portfolio_url_check
-            url_result = await url_reachability_check(value, cfg.reachability_timeout_seconds, key) if cfg.reachability_check_enabled and value else checker(value)
+            url_result = await url_reachability_check(value, cfg.reachability_timeout_seconds, key,
+                                                      enabled=cfg.reachability_check_enabled) if value else checker(value)
+            if not value:
+                url_result = checker(value)
             result_set.append(url_result)
         for result in result_set:
             db.add(VerificationResult(company_id=app.company_id, application_id=app.id, check_type=result.check_type, status=result.status, signal=result.signal, details=result.details))

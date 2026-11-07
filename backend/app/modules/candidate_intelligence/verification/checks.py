@@ -10,13 +10,24 @@ from urllib.parse import urljoin, urlparse
 from app.modules.candidate_intelligence.types import VerificationResultData
 
 EMAIL_RE = re.compile(r"^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$", re.I)
+EMAIL_CANDIDATE_RE = re.compile(r"[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+", re.I)
 PHONE_RE = re.compile(r"^\+?[0-9][0-9 .()\-]{6,24}[0-9]$")
 
 
-def email_check(value: str | None) -> VerificationResultData:
+def email_check(value: str | None, enabled: bool = True) -> VerificationResultData:
+    return email_verification(value, enabled)
+
+
+def email_verification(value: str | None, enabled: bool = True) -> VerificationResultData:
+    if not enabled:
+        return VerificationResultData("email_syntax", "not_verified", "Email check is disabled", {"reason_code": "check_disabled"})
     if not value:
         return VerificationResultData("email_syntax", "not_verified", "Email absent", {"reason_code": "missing_value"})
-    normalized = value.strip()
+    found = EMAIL_CANDIDATE_RE.findall(value)
+    if len(found) > 1:
+        return VerificationResultData("email_syntax", "needs_review", "Multiple email addresses were provided", {"reason_code": "multiple_emails"})
+    normalized = normalize_email(value)
+    internal_spaces_removed = bool(re.search(r"\s", value.strip()))
     valid = bool(EMAIL_RE.fullmatch(normalized))
     try:
         from email_validator import validate_email
@@ -35,9 +46,18 @@ def email_check(value: str | None) -> VerificationResultData:
         signals.append("role_account")
     if domain.casefold() in disposable_domains:
         signals.append("disposable_domain")
+    if internal_spaces_removed:
+        signals.append("internal_whitespace_removed")
     status = "needs_review" if signals else "passed"
     return VerificationResultData("email_syntax", status, "Syntax only; does not prove control of address",
                                   {"reason_code": signals[0] if signals else "syntax_valid", "signals": signals})
+
+
+def normalize_email(value: str | None) -> str | None:
+    """Normalize email whitespace without modifying the caller's raw string."""
+    if value is None:
+        return None
+    return re.sub(r"\s+", "", value.strip()).casefold()
 
 
 def phone_check(value: str | None, region: str | None = None) -> VerificationResultData:
@@ -46,9 +66,13 @@ def phone_check(value: str | None, region: str | None = None) -> VerificationRes
     normalized = value.strip()
     try:
         import phonenumbers
-        if not normalized.startswith("+") and not region:
+        if _phone_match_count(normalized, region) > 1:
+            return VerificationResultData("phone_format", "needs_review", "Multiple phone numbers were provided", {"reason_code": "multiple_numbers"})
+        if not re.search(r"\d", normalized):
+            return VerificationResultData("phone_format", "failed", "Phone number is malformed", {"reason_code": "invalid_number"})
+        if not normalized.startswith(("+", "00")) and not region:
             return VerificationResultData("phone_format", "not_verified", "National phone number cannot be validated without a configured region", {"reason_code": "region_not_configured"})
-        parsed = phonenumbers.parse(normalized, region)
+        parsed = phonenumbers.parse("+" + normalized[2:] if normalized.startswith("00") else normalized, region)
         if not phonenumbers.is_possible_number(parsed):
             return VerificationResultData("phone_format", "failed", "Phone number is not valid for its numbering plan", {"reason_code": "invalid_number"})
         if not phonenumbers.is_valid_number(parsed):
@@ -58,7 +82,12 @@ def phone_check(value: str | None, region: str | None = None) -> VerificationRes
                 {"reason_code": "possible_not_valid"},
             )
         e164 = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-        return VerificationResultData("phone_format", "passed", "Format only; does not prove control of number", {"normalized_e164": e164})
+        details = {"normalized_e164": e164}
+        if parsed.extension:
+            details["extension"] = parsed.extension
+        if normalized.startswith("00"):
+            details["converted_international_prefix"] = True
+        return VerificationResultData("phone_format", "passed", "Format only; does not prove control of number", details)
     except ImportError:
         pass
     except Exception:
@@ -71,19 +100,46 @@ def phone_check(value: str | None, region: str | None = None) -> VerificationRes
     return VerificationResultData("phone_format", "needs_review", "Phone format is plausible; install phonenumbers for numbering-plan validation", {"reason_code": "validation_unavailable"})
 
 
-def completeness_check(profile: dict | None, source_text: str | None, review_threshold: float = 0.75, fail_threshold: float = 0.25) -> VerificationResultData:
-    if not source_text and not profile:
+def _phone_match_count(value: str, region: str | None) -> int:
+    try:
+        import phonenumbers
+        return sum(1 for _ in phonenumbers.PhoneNumberMatcher(value, region))
+    except (ImportError, Exception):
+        return 0
+
+
+def normalize_phone(value: str | None, region: str | None = None) -> str | None:
+    """Return canonical E.164 when numbering-plan metadata can parse the value."""
+    if not value:
+        return None
+    try:
+        import phonenumbers
+        normalized = value.strip()
+        if normalized.startswith("00"):
+            normalized = "+" + normalized[2:]
+        elif not normalized.startswith("+") and not region:
+            return None
+        parsed = phonenumbers.parse(normalized, region)
+        if not phonenumbers.is_possible_number(parsed) or not phonenumbers.is_valid_number(parsed):
+            return None
+        return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        return None
+
+
+def completeness_check(profile: dict | None, source_text: str | None, review_threshold: float = 0.80, fail_threshold: float = 0.50) -> VerificationResultData:
+    if not profile:
         return VerificationResultData("resume_completeness", "not_verified", "Resume data absent")
-    profile = profile or {}
-    present = sum(bool(profile.get(k)) for k in ("skills", "employment", "education", "projects"))
-    required = ("skills", "employment", "education", "projects")
+    present = sum(bool(profile.get(k)) for k in ("skills", "employment", "education", "projects", "certifications"))
+    required = ("skills", "employment", "education", "projects", "certifications")
     missing = [key for key in required if not profile.get(key)]
-    ratio = (len(required) - len(missing)) / len(required)
-    if len((source_text or "").strip()) < 40:
-        status, reason = "needs_review", "below_content_floor"
-    elif ratio < fail_threshold:
+    parsed_ratio = profile.get("completeness")
+    ratio = (max(0.0, min(1.0, float(parsed_ratio)))
+             if isinstance(parsed_ratio, (int, float))
+             else (len(required) - len(missing)) / len(required))
+    if ratio < fail_threshold:
         status, reason = "failed", "insufficient_sections"
-    elif ratio < review_threshold or missing:
+    elif ratio < review_threshold:
         status, reason = "needs_review", "expected_sections_missing"
     else:
         status, reason = "passed", "sections_complete"
@@ -104,7 +160,12 @@ def _year_month(value: str) -> tuple[int, int] | None:
     return year, month
 
 
-def timeline_check(entries: list[dict] | None, today: date) -> VerificationResultData:
+def timeline_check(
+    entries: list[dict] | None,
+    today: date,
+    overlap_tolerance_months: int = 1,
+    gap_threshold_months: int = 12,
+) -> VerificationResultData:
     if not entries:
         return VerificationResultData("timeline_consistency", "not_verified", "No timeline data")
     spans = []
@@ -112,8 +173,9 @@ def timeline_check(entries: list[dict] | None, today: date) -> VerificationResul
     for i, row in enumerate(entries):
         start = _year_month(row.get("start_date"))
         end = _year_month(row.get("end_date")) if row.get("end_date") else ((today.year, today.month) if row.get("is_current") else None)
-        if row.get("start_date") and start is None or row.get("end_date") and end is None:
-            anomalies.append({"index": i, "signal": "malformed_date"}); continue
+        if (row.get("start_date") and start is None) or (row.get("end_date") and end is None):
+            anomalies.append({"index": i, "signal": "malformed_date"})
+            continue
         if row.get("is_current") and row.get("end_date") and end:
             if end < (today.year, today.month):
                 anomalies.append({"index": i, "signal": "current_role_has_past_end"})
@@ -132,40 +194,60 @@ def timeline_check(entries: list[dict] | None, today: date) -> VerificationResul
     overlaps = []
     for n, (start, end, idx) in enumerate(spans):
         for other_start, other_end, other_idx in spans[n + 1:]:
-            if start <= other_end and other_start <= end:
-                overlaps.append((idx, other_idx))
+            overlap_start, overlap_end = max(start, other_start), min(end, other_end)
+            if overlap_start <= overlap_end:
+                months = (overlap_end[0] - overlap_start[0]) * 12 + overlap_end[1] - overlap_start[1] + 1
+                if months > overlap_tolerance_months:
+                    overlaps.append({"entries": [idx, other_idx], "months": months})
     gaps = []
     ordered = sorted(spans)
     for left, right in zip(ordered, ordered[1:]):
         delta = (right[0][0] - left[1][0]) * 12 + right[0][1] - left[1][1]
-        if delta > 1:
-            gaps.append({"months": delta - 1, "signal": "timeline_gap_neutral"})
-    if any(item["signal"] in {"end_before_start", "future_date"} for item in anomalies):
+        missing_months = delta - 1
+        if missing_months > gap_threshold_months:
+            gaps.append({"months": missing_months, "signal": "timeline_gap_neutral",
+                         "message": "Dates show a gap; this is temporal information only."})
+    if any(item["signal"] in {"end_before_start", "future_date", "malformed_date"} for item in anomalies):
         status = "failed"
-    elif anomalies or overlaps:
+    elif anomalies or overlaps or gaps:
         status = "needs_review"
+    elif len(spans) < 2:
+        status = "not_verified"
     else:
         status = "passed"
-    return VerificationResultData("timeline_consistency", status, "Timeline consistency signals only", {"anomalies": anomalies, "overlaps": overlaps, "gaps": gaps})
+    signal = ("Timeline dates are temporal signals only; gaps do not indicate performance."
+              if gaps else "Timeline consistency signals only; they do not prove performance or employment.")
+    return VerificationResultData("timeline_consistency", status, signal, {"anomalies": anomalies, "overlaps": overlaps, "gaps": gaps})
 
 
 def duplicate_signals(email: str | None, phone: str | None, resume_hash: str | None,
-                      existing: list[dict], company_id: str) -> VerificationResultData:
+                      existing: list[dict], company_id: str, *, scope: str = "company",
+                      job_id: str | None = None, phone_region: str | None = None) -> VerificationResultData:
     if not any((email, phone, resume_hash)):
         return VerificationResultData("duplicate_signal", "not_verified", "No comparison identifiers")
+    if scope not in {"job", "company"}:
+        raise ValueError("duplicate scope must be 'job' or 'company'")
+    candidates = [row for row in existing if str(row.get("company_id")) == str(company_id)
+                  and (scope != "job" or str(row.get("job_id")) == str(job_id))]
+    if not candidates:
+        return VerificationResultData("duplicate_signal", "not_verified", "No comparable applications in the configured scope",
+                                      {"reason_code": "no_comparisons", "scope": scope})
     matches = []
-    for row in existing:
-        if str(row.get("company_id")) != str(company_id):
-            continue
-        norm_email = lambda x: str(x).strip().casefold()
-        norm_phone = lambda x: re.sub(r"\D", "", str(x))
+    normalized_email = normalize_email(email)
+    normalized_phone = normalize_phone(phone, phone_region)
+    for row in candidates:
         fields = []
-        if email and row.get("email") and norm_email(row["email"]) == norm_email(email): fields.append("email")
-        if phone and row.get("phone") and norm_phone(row["phone"]) == norm_phone(phone): fields.append("phone")
+        if normalized_email and normalize_email(row.get("email")) == normalized_email:
+            fields.append("email")
+        row_phone = normalize_phone(row.get("phone"), phone_region)
+        if normalized_phone and row_phone == normalized_phone:
+            fields.append("phone")
         if resume_hash and row.get("resume_hash") and str(row["resume_hash"]).casefold() == str(resume_hash).casefold(): fields.append("resume_hash")
         if fields:
             matches.append({"application_id": str(row.get("application_id")), "fields": fields})
-    return VerificationResultData("duplicate_signal", "needs_review" if matches else "passed", "Duplicate indicators only; not a determination of identity", {"matches": matches})
+    return VerificationResultData("duplicate_signal", "needs_review" if matches else "passed",
+                                  "Duplicate indicators only; they do not determine identity.",
+                                  {"matches": matches, "scope": scope})
 
 
 def portfolio_url_check(value: str | None) -> VerificationResultData:
@@ -179,11 +261,11 @@ def portfolio_url_check(value: str | None) -> VerificationResultData:
     if len(value) > 2048:
         return VerificationResultData("portfolio_url", "failed", "URL exceeds the supported length", {"reason_code": "url_too_long"})
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-        return VerificationResultData("portfolio_url", "failed", "URL format invalid")
+        return VerificationResultData("portfolio_url", "failed", "URL format invalid", {"reason_code": "invalid_url"})
     try:
         ip = ipaddress.ip_address(parsed.hostname)
         if not ip.is_global:
-            return VerificationResultData("portfolio_url", "failed", "Private or reserved address blocked")
+            return VerificationResultData("portfolio_url", "failed", "Private or reserved address blocked", {"reason_code": "ssrf_blocked"})
     except ValueError:
         pass
     return VerificationResultData("portfolio_url", "passed", "URL format only; a reachable public profile does not prove skills or employment")
@@ -196,10 +278,13 @@ def github_url_check(value: str | None) -> VerificationResultData:
     if parsed.scheme not in {"http", "https"} or (parsed.hostname or "").casefold() not in {"github.com", "www.github.com"} or parsed.username or parsed.password:
         return VerificationResultData("github_url", "failed", "URL must use the public GitHub profile host", {"reason_code": "invalid_host_or_scheme"})
     parts = [part for part in parsed.path.split("/") if part]
-    if (len(parts) != 1 or parts[0] in {"features", "topics", "settings", "login", "signup", "orgs", "marketplace"}
+    reserved = {"features", "topics", "settings", "login", "signup", "orgs", "marketplace"}
+    if (len(parts) not in {1, 2} or not parts or parts[0].casefold() in reserved
             or len(parts[0]) > 39 or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", parts[0])):
-        return VerificationResultData("github_url", "failed", "URL must identify one GitHub user profile", {"reason_code": "invalid_profile_path"})
-    return VerificationResultData("github_url", "passed", "GitHub profile URL format only; it does not prove skills or employment", {"username": parts[0]})
+        return VerificationResultData("github_url", "needs_review", "GitHub path is not a user profile or repository path", {"reason_code": "wrong_path_shape"})
+    if len(parts) == 2 and not re.fullmatch(r"[A-Za-z0-9_.-]+", parts[1]):
+        return VerificationResultData("github_url", "needs_review", "GitHub repository path is malformed", {"reason_code": "wrong_path_shape"})
+    return VerificationResultData("github_url", "passed", "GitHub profile or repository path format only; it does not prove skills or employment", {"username": parts[0]})
 
 
 def overall_status(results: list[VerificationResultData]) -> str:
@@ -208,39 +293,103 @@ def overall_status(results: list[VerificationResultData]) -> str:
     return max((r.status for r in results), key=lambda status: order[status], default="not_verified")
 
 
-async def url_reachability_check(value: str | None, timeout: float = 2.0, check_type: str = "portfolio_url") -> VerificationResultData:
-    """Check public URL reachability while validating every redirect target."""
+async def url_reachability_check(
+    value: str | None,
+    timeout: float = 2.0,
+    check_type: str = "portfolio_url",
+    *,
+    enabled: bool = True,
+    transport=None,
+    resolver=None,
+) -> VerificationResultData:
+    """Check a public URL without forwarding credentials or trusting redirects."""
+    import inspect
+    import httpx
+
     base = github_url_check(value) if check_type == "github_url" else portfolio_url_check(value)
     if base.status != "passed":
         return base
-    import httpx
+    if not enabled:
+        return VerificationResultData(check_type, "not_verified", "URL reachability check is disabled", {"reason_code": "reachability_disabled"})
+
+    original_host = (urlparse(value.strip()).hostname or "").casefold()
+    current = value.strip()
+    seen = set()
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-            current = value
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, transport=transport, trust_env=False) as client:
             for hop in range(4):
                 parsed = urlparse(current)
-                infos = await asyncio.wait_for(asyncio.get_running_loop().getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM), timeout=timeout)
-                addresses = {ipaddress.ip_address(info[4][0]) for info in infos}
+                current_key = current.split("#", 1)[0]
+                if current_key in seen:
+                    return VerificationResultData(check_type, "needs_review", "URL redirect loop detected", {"reason_code": "url_redirect_loop", "redirect_hop": hop})
+                seen.add(current_key)
+
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                if resolver is None:
+                    infos = await asyncio.wait_for(
+                        asyncio.get_running_loop().getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM),
+                        timeout=timeout,
+                    )
+                    addresses = {ipaddress.ip_address(info[4][0]) for info in infos}
+                else:
+                    resolved = resolver(parsed.hostname, port)
+                    if inspect.isawaitable(resolved):
+                        resolved = await asyncio.wait_for(resolved, timeout=timeout)
+                    addresses = {ipaddress.ip_address(address) for address in resolved}
                 if not addresses or any(not address.is_global for address in addresses):
-                    return VerificationResultData(check_type, "failed", "URL resolves to a private or reserved address", {"reason_code": "blocked_address", "redirect_hop": hop})
-                response = await client.head(current, headers={"User-Agent": "Job-Sentry-verification"})
+                    return VerificationResultData(check_type, "failed", "URL resolves to a private or reserved address", {"reason_code": "ssrf_blocked", "redirect_hop": hop})
+
+                headers = {"User-Agent": "Job-Sentry-verification"}
+                request = client.build_request("HEAD", current, headers=headers)
+                request.headers.pop("cookie", None)
+                request.headers.pop("authorization", None)
+                response = await client.send(request, follow_redirects=False)
+                client.cookies.clear()
                 status_code, location = response.status_code, response.headers.get("location")
                 if status_code in {405, 501}:
-                    async with client.stream("GET", current, headers={"User-Agent": "Job-Sentry-verification", "Range": "bytes=0-0"}) as fallback:
-                        status_code, location = fallback.status_code, fallback.headers.get("location")
+                    fallback = client.build_request("GET", current, headers={**headers, "Range": "bytes=0-0"})
+                    fallback.headers.pop("cookie", None)
+                    fallback.headers.pop("authorization", None)
+                    response = await client.send(fallback, follow_redirects=False)
+                    client.cookies.clear()
+                    status_code, location = response.status_code, response.headers.get("location")
+
                 if status_code not in {301, 302, 303, 307, 308}:
+                    if status_code == 404:
+                        return VerificationResultData(check_type, "needs_review", "Public URL was not found; reachability does not prove skills or employment", {"reason_code": "url_not_found", "status_code": status_code})
+                    if status_code == 403:
+                        return VerificationResultData(check_type, "needs_review", "Public URL access was forbidden; reachability does not prove skills or employment", {"reason_code": "url_forbidden", "status_code": status_code})
+                    if status_code >= 500:
+                        return VerificationResultData(check_type, "needs_review", "Public URL server returned an error; reachability does not prove skills or employment", {"reason_code": "url_server_error", "status_code": status_code})
                     if status_code >= 400:
-                        return VerificationResultData(check_type, "needs_review", "Public URL returned an unsuccessful response", {"status_code": status_code})
-                    return VerificationResultData(check_type, "passed", "URL is reachable; this does not prove identity, skills, or employment", {"redirects_followed": hop})
+                        return VerificationResultData(check_type, "needs_review", "Public URL returned an unsuccessful response; reachability does not prove skills or employment", {"reason_code": "url_http_error", "status_code": status_code})
+                    return VerificationResultData(check_type, "passed", "URL is reachable; reachability proves nothing about skills or employment", {"redirects_followed": hop})
+
                 if not location:
                     return VerificationResultData(check_type, "needs_review", "Redirect has no destination", {"reason_code": "invalid_redirect"})
                 if hop == 3:
-                    return VerificationResultData(check_type, "needs_review", "URL exceeded the redirect limit", {"reason_code": "redirect_limit"})
-                current = urljoin(current, location)
-                if parsed.scheme == "https" and urlparse(current).scheme != "https":
-                    return VerificationResultData(check_type, "failed", "HTTPS redirects may not downgrade to HTTP", {"reason_code": "scheme_downgrade"})
-                redirected = github_url_check(current) if check_type == "github_url" else portfolio_url_check(current)
-                if redirected.status != "passed":
-                    return VerificationResultData(check_type, "failed", "Redirect target URL is not allowed", {"reason_code": "invalid_redirect_target"})
-    except (OSError, asyncio.TimeoutError, httpx.HTTPError):
+                    return VerificationResultData(check_type, "needs_review", "URL exceeded the redirect limit", {"reason_code": "url_redirect_limit"})
+                redirected_url = urljoin(current, location)
+                redirected = urlparse(redirected_url)
+                if (redirected.scheme not in {"http", "https"} or not redirected.hostname
+                        or redirected.username or redirected.password):
+                    return VerificationResultData(check_type, "failed", "Redirect target URL is malformed", {"reason_code": "invalid_url", "redirect_hop": hop + 1})
+                if (redirected.hostname or "").casefold() != original_host:
+                    return VerificationResultData(check_type, "needs_review", "Redirect changes the URL host; the destination was not checked", {"reason_code": "url_redirect_different_host", "redirect_hop": hop + 1})
+                if parsed.scheme == "https" and redirected.scheme != "https":
+                    return VerificationResultData(check_type, "needs_review", "Redirect downgrades from HTTPS", {"reason_code": "url_redirect_downgrade", "redirect_hop": hop + 1})
+                redirected_check = github_url_check(redirected_url) if check_type == "github_url" else portfolio_url_check(redirected_url)
+                if redirected_check.status != "passed":
+                    reason = redirected_check.details.get("reason_code")
+                    if reason == "ssrf_blocked":
+                        return VerificationResultData(check_type, "failed", "Redirect target is an SSRF-blocked address", {"reason_code": "ssrf_blocked", "redirect_hop": hop + 1})
+                    return VerificationResultData(check_type, "needs_review", "Redirect target could not be validated", {"reason_code": "invalid_redirect_target", "redirect_hop": hop + 1})
+                current = redirected_url
+    except asyncio.TimeoutError:
+        return VerificationResultData(check_type, "not_verified", "URL reachability timed out", {"reason_code": "timeout"})
+    except socket.gaierror:
+        return VerificationResultData(check_type, "not_verified", "URL DNS lookup failed", {"reason_code": "dns_failure"})
+    except httpx.TimeoutException:
+        return VerificationResultData(check_type, "not_verified", "URL reachability timed out", {"reason_code": "timeout"})
+    except (OSError, httpx.HTTPError):
         return VerificationResultData(check_type, "not_verified", "URL reachability could not be verified", {"reason_code": "network_unavailable"})
