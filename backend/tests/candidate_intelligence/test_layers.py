@@ -55,7 +55,8 @@ async def test_github_languages_are_collected_as_weak_public_signals_without_aut
 def test_verification_statuses_and_malformed_timeline():
     assert email_check(None).status == "not_verified"
     assert email_check("bad").status == "failed"
-    assert phone_check("+1 (555) 123-4567").status == "passed"
+    # 555 is not an allocated NANP area code; this plausible format is not proof of a valid number.
+    assert phone_check("+1 (555) 123-4567").status == "needs_review"
     assert completeness_check({}, None).status == "not_verified"
     timeline = timeline_check([{"start_date": "2099-01", "end_date": "2000-01"}], date(2025, 1, 1))
     assert timeline.status == "failed"
