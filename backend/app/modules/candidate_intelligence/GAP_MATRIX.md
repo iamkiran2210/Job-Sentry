@@ -39,7 +39,7 @@ Status is evidence-based as of 2026-11-08. `done` rows include passing test name
 | Missing/other-company resources 404 and viewer restrictions 403 | **done** — `test_resources_are_company_scoped_and_missing_resources_return_404`, `test_viewer_access_cannot_run_verify_or_rank` — [test_endpoint_contracts.py](../../tests/candidate_intelligence/test_endpoint_contracts.py). |
 | Alembic round trip, vector extension and Phase 1–3 row survival | **done** — `test_postgres_migration_roundtrip_and_phase1_to_3_data_survival` — [test_migration_roundtrip.py](../../tests/candidate_intelligence/test_migration_roundtrip.py). |
 | Alembic model drift on migrated schema | **done** — `test_alembic_built_schema_has_no_model_drift` — [test_alembic_fixture.py](../../tests/candidate_intelligence/test_alembic_fixture.py). |
-| Full AI test directory, including PDF/resume tests | **NOT VERIFIED** — collection stops in four resume test files because `pymupdf`/`fitz` is not installed and no wheel is available in the offline cache. One test is skipped by its existing collection condition. Resume when the dependency is made available offline, then rerun `tests/ai_features` with `--timeout=60`. |
+| Full AI test directory, including PDF/resume tests | **done** — `test_offline_heuristic_extracts_valid_grounded_profiles_with_no_fabrication` — [test_ai_extractor.py](../../tests/ai_features/ai/test_ai_extractor.py); full `tests/ai_features` run: 126 passed, 2 skipped. |
 | Lint and type checks | **NOT VERIFIED** — no lint/type tool or CI workflow is declared in the inspected project configuration; compileall is not an equivalent check. `python -m compileall -q app/modules/candidate_intelligence` passed. |
 
 ## Acceptance criteria
@@ -57,4 +57,4 @@ Status is evidence-based as of 2026-11-08. `done` rows include passing test name
 
 ## Summary
 
-Implementation matrix: **33 done**, **2 NOT VERIFIED**. Remaining items are the full AI directory (offline PyMuPDF dependency unavailable) and configured lint/type checks (no tools are declared). The E7 blockers do not invalidate the passing candidate-intelligence test suite, but they remain open.
+Implementation matrix: **34 done**, **1 NOT VERIFIED**. The remaining item is configured lint/type checks; no tools are declared and compileall is not equivalent.
