@@ -61,3 +61,13 @@ Validation: E5 integration tests — 6 passed; migration round trip — 1 passed
 Completed API response fields for pre-score analysis, filtered ranking pages, and `ranking_run` history; GET ranking/history now read only persisted run data.
 Masked normalized phone values in verify responses and enforced enum/range/page-size validation, missing-run 404, no-run empty 200, job/company access rules, and scoring-version/application-ID validation.
 Validation: endpoint contract file — 11 passed; full candidate-intelligence suite — 192 passed in 49.51s against disposable `job_sentry_test`.
+
+## E7 AI suite and lint/types (NOT VERIFIED, 2026-11-08)
+The AI directory did not start: 4 resume test modules failed collection because `pymupdf`/`fitz` is absent; 1 test was skipped. `backend/pyproject.toml` now declares the runtime dependency, but offline installation confirmed no matching wheel is cached, so network was not used.
+No lint/type tool or CI workflow config is declared in the inspected project files. `python -m compileall -q app/modules/candidate_intelligence` passed; full `pytest --collect-only -q` found 304 tests and the same 4 import errors.
+Resume from E7 when PyMuPDF can be provided offline, then rerun the AI directory and confirm lint/type configuration or report its absence.
+
+## E8 docs (2026-11-08)
+Rewrote the module README with architecture, category formulas, Decimal rounding, missing-data/bounds behavior, verification matrix, ranking provenance/lock behavior, schema/version guidance, safe migration workflow, limitations and responsible use.
+Added `API.md` documenting all five endpoints, request/response examples, filters, status/error contracts and authorization behavior.
+Validation: endpoint and verification contracts remain covered by named tests; full candidate-intelligence suite — 192 passed in 48.52s against disposable `job_sentry_test`.
