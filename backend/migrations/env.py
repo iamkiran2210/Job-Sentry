@@ -41,6 +41,33 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+_CANDIDATE_INTELLIGENCE_TABLES = {
+    "verification_results",
+    "candidate_scores",
+    "score_evidence",
+    "ranking_history",
+}
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """Limit Phase 4 drift checks to this module's tables."""
+    if type_ == "table":
+        return name in _CANDIDATE_INTELLIGENCE_TABLES
+    if type_ == "index" and name == "ix_score_evidence_embedding_hnsw":
+        # Created by c4 only when pgvector is installed; it is extension-specific.
+        return False
+    table = getattr(obj, "table", None)
+    if table is None and compare_to is not None:
+        table = getattr(compare_to, "table", None)
+    return table is None or table.name in _CANDIDATE_INTELLIGENCE_TABLES
+
+
+def compare_type(context_, inspected_column, metadata_column, inspected_type, metadata_type):
+    """PostgreSQL's pgvector type is not reflected by SQLAlchemy's default inspector."""
+    if metadata_column.table.name == "score_evidence" and metadata_column.name == "embedding":
+        return False
+    return None
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -50,6 +77,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -61,6 +89,8 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=False,
+        include_object=include_object,
+        compare_type=compare_type,
     )
 
     with context.begin_transaction():
