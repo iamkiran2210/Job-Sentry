@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, Uuid, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, JSON, Numeric, String, Text, Uuid, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import UserDefinedType
 from sqlalchemy.ext.compiler import compiles

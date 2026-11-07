@@ -5,7 +5,7 @@ This inventory is based on source inspection and repository searches on 2026-11-
 | file:line | category | severity | action |
 |---|---|---:|---|
 | `backend/pyproject.toml:30` | tooling | medium | Add Ruff and strict mypy to the dev group; configure scoped checks. `vulture`, `pip-audit`, `detect-secrets`, and `gitleaks` are unavailable offline. |
-| `backend/app/**` | unused imports / dead code | medium | NOT VERIFIED: vulture and Ruff are unavailable in this environment; run after offline tool installation. |
+| `backend/app/**` | unused imports / dead code | medium | A local AST scan found and removed confirmed unused imports in the shared dependency, auth, and candidate-intelligence modules. ORM imports used for relationship registration were retained. Dead-code detection remains NOT VERIFIED because vulture and Ruff are unavailable offline. |
 | `backend/app/**` | circular imports | low | NOT VERIFIED: no import-graph analyzer is installed; full tests and module imports pass, which is not a cycle audit. |
 | `backend/app/models/base.py:9` and `backend/app/ai_features/resumes/timeutil.py` | duplicate utility | low | Consolidate the separate UTC clock helpers if the AI feature tree is brought into the maintained package scope. Both currently return aware UTC values. |
 | `backend/app/core/security.py:128` | broad exception | medium | Narrow token-verification failures and preserve generic client errors; add safe logging. |

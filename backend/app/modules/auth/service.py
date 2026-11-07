@@ -1,11 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     UnauthorizedException,

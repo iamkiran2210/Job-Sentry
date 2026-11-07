@@ -9,8 +9,6 @@ from app.schemas.auth import (
     GoogleOAuthRequest,
     LogoutRequest,
     RefreshTokenRequest,
-    TokenRefreshResponse,
-    TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
 )

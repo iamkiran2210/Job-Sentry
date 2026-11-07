@@ -8,3 +8,8 @@ F0 is complete; the audit records open cleanup tasks, including broad exception 
 Added `ARCHITECTURE.md` describing the current layers, modules, dependency direction and a target tree that follows the existing feature-module layout.
 The guide explicitly treats the untracked `app/ai_features` tree as an integration boundary pending ownership/track review; no source files were moved.
 Validation: full suite — 360 passed, 2 skipped in 127.76s.
+
+## F1 unused imports and dead code (2026-11-08)
+Removed confirmed unused imports from `app/core/dependencies.py`, auth router/service, and candidate-intelligence models/service; relationship-registration imports were preserved.
+The custom AST import scan was a screening aid only; complete dead-code detection remains NOT VERIFIED until Ruff/vulture are available offline.
+Validation: full suite — 360 passed, 2 skipped in 129.54s.

@@ -25,7 +25,7 @@ from app.modules.candidate_intelligence.models import CandidateScore, RankingHis
 from app.modules.candidate_intelligence.ranking.service import rank_rows
 from app.modules.candidate_intelligence.scoring import category_formulas as formulas
 from app.modules.candidate_intelligence.types import ScoringInputs
-from app.modules.candidate_intelligence.verification.checks import completeness_check, duplicate_signals, email_check, github_url_check, overall_status, phone_check, portfolio_url_check, timeline_check, url_reachability_check
+from app.modules.candidate_intelligence.verification.checks import completeness_check, duplicate_signals, email_check, github_url_check, phone_check, portfolio_url_check, timeline_check, url_reachability_check
 
 
 def _json(value):
