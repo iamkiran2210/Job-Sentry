@@ -1,3 +1,4 @@
+import json
 from typing import List, Union
 
 from pydantic import Field, field_validator
@@ -50,10 +51,9 @@ class Settings(BaseSettings):
             # Support comma-separated string or JSON-like
             value = value.strip()
             if value.startswith("[") and value.endswith("]"):
-                import json
                 try:
                     return json.loads(value)
-                except Exception:
+                except json.JSONDecodeError:
                     pass
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value

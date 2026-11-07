@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -7,6 +8,7 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from google.auth.transport import requests as google_requests
+from google.auth.exceptions import GoogleAuthError
 from google.oauth2 import id_token
 
 from app.core.config import settings
@@ -14,6 +16,7 @@ from app.core.exceptions import UnauthorizedException
 
 # Argon2 password hasher instance
 pwd_hasher = PasswordHasher()
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -123,7 +126,14 @@ def verify_google_id_token(token: str) -> Dict[str, Any]:
             raise UnauthorizedException("Invalid Google token issuer")
 
         return id_info
-    except ValueError as e:
-        raise UnauthorizedException(f"Invalid Google ID token: {str(e)}")
-    except Exception as e:
-        raise UnauthorizedException(f"Google token verification failed: {str(e)}")
+    except UnauthorizedException:
+        raise
+    except (ValueError, GoogleAuthError) as exc:
+        logger.info("Google ID token rejected", extra={"error_type": type(exc).__name__})
+        raise UnauthorizedException("Could not validate Google credentials") from exc
+    except Exception as exc:
+        logger.warning(
+            "Google ID token verification failed",
+            extra={"error_type": type(exc).__name__},
+        )
+        raise UnauthorizedException("Could not validate Google credentials") from exc

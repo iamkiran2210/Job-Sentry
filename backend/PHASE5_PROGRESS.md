@@ -18,3 +18,8 @@ Validation: full suite — 360 passed, 2 skipped in 129.54s.
 Reviewed all `datetime.now`/`utcnow`/`fromtimestamp` calls, mapped `DateTime` columns and migrations; clocks are UTC-aware and mapped timestamps use timezone-aware columns, so no code or migration change was needed.
 Corrected the audit: the resume `as_utc` helper re-exports the shared clock and is not a duplicate clock implementation.
 Validation: full suite — 360 passed, 2 skipped in 135.62s.
+
+## F1 exception handling (2026-11-08)
+Google ID-token verification now masks provider exception text from 401 responses and logs only the exception type; malformed CORS JSON catches `JSONDecodeError`, and the audit distinguishes rollback-and-reraise cleanup from swallowed errors.
+Regression: `tests/test_security_exception_safety.py::test_google_token_errors_do_not_expose_provider_details` — 2 parameter cases pass.
+Validation: full suite — 362 passed, 2 skipped in 138.47s. An auth subset run without PostgreSQL stalled in the SQLite fixture and was interrupted; it is not counted as passing evidence.

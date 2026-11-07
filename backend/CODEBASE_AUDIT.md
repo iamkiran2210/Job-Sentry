@@ -8,9 +8,9 @@ This inventory is based on source inspection and repository searches on 2026-11-
 | `backend/app/**` | unused imports / dead code | medium | A local AST scan found and removed confirmed unused imports in the shared dependency, auth, and candidate-intelligence modules. ORM imports used for relationship registration were retained. Dead-code detection remains NOT VERIFIED because vulture and Ruff are unavailable offline. |
 | `backend/app/**` | circular imports | low | NOT VERIFIED: no import-graph analyzer is installed; full tests and module imports pass, which is not a cycle audit. |
 | `backend/app/models/base.py:9` and `backend/app/ai_features/resumes/timeutil.py:5` | duplicate utility | low | No duplicate clock implementation: `timeutil` re-exports the shared `utc_now` helper. Keep that single implementation. |
-| `backend/app/core/security.py:128` | broad exception | medium | Narrow token-verification failures and preserve generic client errors; add safe logging. |
-| `backend/app/core/database.py:60` | swallowed exception | medium | Review the broad cleanup catch; log or handle only expected disposal errors. |
-| `backend/app/core/config.py:61` | broad exception | low | Narrow configuration parsing fallback and record the invalid setting without exposing secrets. |
+| `backend/app/core/security.py:128` | broad exception | medium | Google token failures now return a generic unauthorized message and log only the exception type; regression test covers provider details. |
+| `backend/app/core/database.py:60` | exception cleanup | low | Broad catch is required to roll back and re-raise arbitrary transaction failures; it does not swallow errors, so it remains. |
+| `backend/app/core/config.py:61` | broad exception | low | JSON CORS parsing now catches only `JSONDecodeError`; malformed JSON retains the existing comma-separated fallback. |
 | `backend/app/modules/jobs/router.py:276` | broad exception | medium | Replace catch-all route handling with typed domain/HTTP handling and safe error reporting. |
 | `backend/app/modules/candidate_intelligence/service.py:340,429,444` | broad exception | medium | Classify embedder/LLM and optional persistence failures; add structured warning/error logs. |
 | `backend/app/modules/candidate_intelligence/verification/checks.py:37,93,126` | broad exception | low | Confirm each catch is limited to malformed input normalization and narrow it where possible. |
