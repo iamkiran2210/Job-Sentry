@@ -173,7 +173,7 @@ class CandidateIntelligenceService:
         evidence_rows = []
         if row:
             evidence_rows = (await db.execute(select(ScoreEvidenceRecord).where(ScoreEvidenceRecord.score_id == row.id).order_by(ScoreEvidenceRecord.created_at))).scalars().all()
-        return {"application_id": str(app.id), "score_id": str(row.id) if row else None,
+        return {"application_id": str(app.id), "status_note": "scored" if row else "not_scored", "score_id": str(row.id) if row else None,
                 "score": float(row.score) if row and row.score is not None else None,
                 "score_percent": float(row.score) if row and row.score is not None else None,
                 "score_lower_bound": float(row.score_lower_bound) if row else None,

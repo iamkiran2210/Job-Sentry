@@ -38,6 +38,7 @@ class CategoryAnalysis(BaseModel):
 
 class AnalysisData(BaseModel):
     application_id: UUID
+    status_note: str | None = None
     score_id: UUID | None
     score: float | None
     score_percent: float | None
@@ -108,6 +109,9 @@ class RankingPage(BaseModel):
     offset: int
     limit: int
     items: list[RankedItem]
+    scoring_version: str | None = None
+    algorithm_version: str | None = None
+    filters_applied: dict[str, Any] = Field(default_factory=dict)
 
 
 class RankingRunSummary(BaseModel):

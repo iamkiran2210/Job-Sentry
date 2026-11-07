@@ -56,3 +56,8 @@ Added revision `a91d6e4f2b70` after `f4a1b2c3d5e6`; it adds `ranking_run`, direc
 The rank service now takes a transaction-scoped job advisory lock, validates scoped application IDs and scoring versions, writes run records, reuses current inputs/config unless forced, and persists new score rows for forced rescoring.
 Fixed the migration backfill to temporarily remove e82's update-only history trigger and restore it on downgrade; trigger, lock, reuse, and forced-rescore tests use `alembic_db`.
 Validation: E5 integration tests — 6 passed; migration round trip — 1 passed; Alembic fixture/drift — 2 passed; full candidate-intelligence suite — 181 passed in 38.02s.
+
+## E6 schemas and endpoint contracts (2026-11-08)
+Completed API response fields for pre-score analysis, filtered ranking pages, and `ranking_run` history; GET ranking/history now read only persisted run data.
+Masked normalized phone values in verify responses and enforced enum/range/page-size validation, missing-run 404, no-run empty 200, job/company access rules, and scoring-version/application-ID validation.
+Validation: endpoint contract file — 11 passed; full candidate-intelligence suite — 192 passed in 49.51s against disposable `job_sentry_test`.
