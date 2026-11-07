@@ -7,7 +7,8 @@ from datetime import date
 from decimal import Decimal
 from collections.abc import Mapping
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai_features.models.application import Application
@@ -20,7 +21,7 @@ from app.models.job_requirement import JobRequirement
 from app.modules.candidate_intelligence.config import get_intelligence_settings
 from app.modules.candidate_intelligence.evidence.matchers import exact_skill_evidence, llm_relevance_evidence, semantic_evidence
 from app.modules.candidate_intelligence.evidence.providers import build_embedding_provider, build_llm_analyzer
-from app.modules.candidate_intelligence.models import CandidateScore, RankingHistory, ScoreEvidenceRecord, VerificationResult
+from app.modules.candidate_intelligence.models import CandidateScore, RankingHistory, RankingRun, ScoreEvidenceRecord, VerificationResult
 from app.modules.candidate_intelligence.ranking.service import rank_rows
 from app.modules.candidate_intelligence.scoring import category_formulas as formulas
 from app.modules.candidate_intelligence.types import ScoringInputs
@@ -191,15 +192,30 @@ class CandidateIntelligenceService:
 
     @staticmethod
     async def rank(db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID, filters: dict):
+        lock_key = job_id.int & ((1 << 63) - 1)
+        acquired = (await db.execute(select(func.pg_try_advisory_xact_lock(lock_key)))).scalar_one()
+        if not acquired:
+            raise HTTPException(status_code=409, detail="A ranking run is already in progress for this job")
         job = (await db.execute(select(Job).where(Job.id == job_id))).scalar_one()
         reqs = list((await db.execute(select(JobRequirement).where(JobRequirement.job_id == job.id).order_by(JobRequirement.id))).scalars().all())
         apps = list((await db.execute(select(Application).where(Application.job_id == job.id).order_by(Application.created_at, Application.id))).scalars().all())
+        if filters.get("application_ids") is not None:
+            requested_ids = {uuid.UUID(str(value)) for value in filters["application_ids"]}
+            available_ids = {app.id for app in apps}
+            invalid = sorted(str(value) for value in requested_ids - available_ids)
+            if invalid:
+                raise HTTPException(status_code=422, detail={"message": "application_ids must belong to this job", "invalid_application_ids": invalid})
+            apps = [app for app in apps if app.id in requested_ids]
         rows = []
         scores_by_app = {}
         verification_by_app = {}
+        cfg = get_intelligence_settings()
+        requested_version = filters.get("scoring_version")
+        if requested_version is not None and requested_version != cfg.scoring_version:
+            raise HTTPException(status_code=422, detail=f"Unknown scoring_version: {requested_version}")
         for app in apps:
-            cfg = get_intelligence_settings()
-            score = await ScoringService.score_application(app.id, job.id, cfg, as_of=date.today(), db=db)
+            score = await ScoringService.score_application(app.id, job.id, cfg, as_of=date.today(), db=db,
+                                                           force_rescore=bool(filters.get("force_rescore", False)))
             scores_by_app[str(app.id)] = score
             checks = (await db.execute(select(VerificationResult).where(VerificationResult.application_id == app.id).order_by(VerificationResult.created_at.desc()))).scalars().all()
             latest = {}
@@ -213,7 +229,6 @@ class CandidateIntelligenceService:
             verification_status=filters.get("verification_status"))
         offset, limit = filters.get("offset", 0), filters.get("limit", 50)
         page = all_ranked[offset:offset + limit]
-        cfg = get_intelligence_settings()
         requirements_snapshot = [{"id": str(r.id), "category": str(r.category.value if hasattr(r.category,"value") else r.category), "name": r.name, "type": str(r.requirement_type.value if hasattr(r.requirement_type,"value") else r.requirement_type), "is_mandatory": r.is_mandatory, "weight": r.weight} for r in reqs]
         requirement_hash = hashlib.sha256(json.dumps(requirements_snapshot, sort_keys=True).encode()).hexdigest()
         config_snapshot = {"scoring_version": cfg.scoring_version, "algorithm_version": cfg.algorithm_version,
@@ -227,18 +242,30 @@ class CandidateIntelligenceService:
                              "llm_model": cfg.llm_model, "llm_prompt_version": cfg.llm_prompt_version}
         config_hash = hashlib.sha256(json.dumps({"config": config_snapshot, "providers": provider_snapshot}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         run_id = uuid.uuid4()
+        db.add(RankingRun(run_id=run_id, job_id=job.id, status="completed",
+            counts={"scored": len(apps), "skipped": 0, "failed": 0}, filters_applied=_json(filters),
+            scoring_version=cfg.scoring_version, algorithm_version=cfg.algorithm_version,
+            embedding_model=cfg.semantic_model_name, embedding_model_version=cfg.semantic_model_version,
+            llm_model=cfg.llm_model, prompt_version=cfg.llm_prompt_version,
+            job_requirements_hash=requirement_hash, scoring_config_hash=config_hash, triggered_by=user_id))
         for item in all_ranked:
             score_row = scores_by_app[item["application_id"]]
             tie_key = {"score": item.get("score"), "eligibility": item.get("eligibility"), "skills_score": item.get("skills_score"), "data_completeness": item.get("data_completeness"), "application_created_at": item.get("application_created_at"), "application_id": item.get("application_id")}
-            db.add(RankingHistory(company_id=job.company_id, job_id=job.id, run_id=run_id, application_id=uuid.UUID(item["application_id"]), candidate_score_id=score_row.id, rank=item["rank"], total_score=item.get("score"), tie_break_key=tie_key, requirements_snapshot=requirements_snapshot, requirements_hash=requirement_hash, ranked_items=all_ranked, filters_used=filters, scoring_version=cfg.scoring_version, algorithm_version=cfg.algorithm_version, config_snapshot=config_snapshot, config_hash=config_hash, provider_snapshot=provider_snapshot, triggered_by=user_id))
+            verifications = item.get("verification_statuses") or []
+            verification_status = next((status for status in ("failed", "needs_review", "not_verified", "passed") if status in verifications), "not_verified")
+            db.add(RankingHistory(company_id=job.company_id, job_id=job.id, run_id=run_id, application_id=uuid.UUID(item["application_id"]), candidate_score_id=score_row.id, rank=item["rank"], total_score=item.get("score"), tie_break_key=tie_key, requirements_snapshot=requirements_snapshot, requirements_hash=requirement_hash, ranked_items=all_ranked, filters_used=_json(filters), scoring_version=cfg.scoring_version, algorithm_version=cfg.algorithm_version, config_snapshot=config_snapshot, config_hash=config_hash, provider_snapshot=provider_snapshot, embedding_model=cfg.semantic_model_name, embedding_model_version=cfg.semantic_model_version, llm_model=cfg.llm_model, prompt_version=cfg.llm_prompt_version, job_requirements_hash=requirement_hash, scoring_config_hash=config_hash, eligibility=item.get("eligibility") or "needs_review", verification_status=verification_status, triggered_by=user_id))
         if not all_ranked:
             db.add(RankingHistory(company_id=job.company_id, job_id=job.id, run_id=run_id,
                 application_id=None, candidate_score_id=None, rank=None, total_score=None,
                 tie_break_key={}, requirements_snapshot=requirements_snapshot,
-                requirements_hash=requirement_hash, ranked_items=[], filters_used=filters,
+                requirements_hash=requirement_hash, ranked_items=[], filters_used=_json(filters),
                 scoring_version=cfg.scoring_version, algorithm_version=cfg.algorithm_version,
                 config_snapshot=config_snapshot, config_hash=config_hash,
-                provider_snapshot=provider_snapshot, triggered_by=user_id))
+                provider_snapshot=provider_snapshot, embedding_model=cfg.semantic_model_name,
+                embedding_model_version=cfg.semantic_model_version, llm_model=cfg.llm_model,
+                prompt_version=cfg.llm_prompt_version, job_requirements_hash=requirement_hash,
+                scoring_config_hash=config_hash, eligibility="needs_review",
+                verification_status="not_verified", triggered_by=user_id))
         await db.flush()
         return {"run_id": str(run_id), "count": len(page), "total_count": len(all_ranked),
                 "offset": offset, "limit": limit, "scoring_version": cfg.scoring_version,
@@ -250,7 +277,7 @@ class ScoringService:
     """Explicit score-write entry point. Read endpoints must not call this."""
 
     @staticmethod
-    async def score_application(application_id: uuid.UUID, job_id: uuid.UUID, scoring_config=None, as_of: date | None = None, db: AsyncSession | None = None):
+    async def score_application(application_id: uuid.UUID, job_id: uuid.UUID, scoring_config=None, as_of: date | None = None, db: AsyncSession | None = None, force_rescore: bool = False):
         if db is None:
             raise ValueError("AsyncSession is required")
         application = (await db.execute(select(Application).where(Application.id == application_id, Application.job_id == job_id))).scalar_one_or_none()
@@ -264,6 +291,36 @@ class ScoringService:
         scoring_config = scoring_config or get_intelligence_settings()
         as_of = as_of or date.today()
         inputs = build_scoring_inputs(application, job, as_of, profile, requirements)
+        if not force_rescore:
+            existing_rows = (await db.execute(select(CandidateScore).where(
+                CandidateScore.application_id == application_id,
+                CandidateScore.job_id == job_id,
+                CandidateScore.scoring_version == scoring_config.scoring_version,
+                CandidateScore.algorithm_version == scoring_config.algorithm_version,
+            ).order_by(CandidateScore.created_at.desc()))).scalars().all()
+            serialized_inputs = _json(inputs.__dict__)
+            for existing in existing_rows:
+                snapshot = existing.config_snapshot or {}
+                current_weights = {name: str(getattr(scoring_config, f"weight_{name}")) for name in formulas.CATEGORIES}
+                config_matches = (
+                    snapshot.get("scoring_version") == scoring_config.scoring_version
+                    and snapshot.get("algorithm_version") == scoring_config.algorithm_version
+                    and snapshot.get("weights") == current_weights
+                    and snapshot.get("semantic_min") == scoring_config.semantic_min
+                    and snapshot.get("semantic_full") == scoring_config.semantic_full
+                    and snapshot.get("semantic_credit_cap") == scoring_config.semantic_credit_cap
+                    and snapshot.get("low_completeness_threshold") == str(scoring_config.low_completeness_threshold)
+                    and snapshot.get("skill_aliases") == scoring_config.skill_aliases
+                    and snapshot.get("relevance_scores") == scoring_config.relevance_scores
+                    and snapshot.get("embedding_provider") == scoring_config.embedding_provider
+                    and snapshot.get("semantic_model_name") == scoring_config.semantic_model_name
+                    and snapshot.get("semantic_model_version") == scoring_config.semantic_model_version
+                    and snapshot.get("llm_provider") == scoring_config.llm_provider
+                    and snapshot.get("llm_model") == scoring_config.llm_model
+                    and snapshot.get("llm_prompt_version") == scoring_config.llm_prompt_version
+                )
+                if config_matches and snapshot.get("reproducibility_inputs") == serialized_inputs:
+                    return existing
         evidence = await ScoringService._collect_evidence(inputs, scoring_config)
         adapted = evidence_to_category_inputs(evidence, inputs)
         reqs = list(inputs.requirements)
@@ -311,7 +368,11 @@ class ScoringService:
             "components": _json(r.components), "evidence_ids": list(r.evidence_ids), "notes": list(r.notes)}
             for r in (skills, experience, projects, education, certifications)}
         snapshot = {**config_snapshot, "category_scores": category_scores, "as_of_date": as_of.isoformat(), "inputs_hash": inputs_hash}
-        score_row = (await db.execute(select(CandidateScore).where(CandidateScore.application_id == application_id, CandidateScore.job_id == job_id, CandidateScore.scoring_version == scoring_config.scoring_version, CandidateScore.inputs_hash == inputs_hash))).scalar_one_or_none()
+        if force_rescore:
+            source_inputs_hash = inputs_hash
+            inputs_hash = hashlib.sha256(f"{source_inputs_hash}:{uuid.uuid4()}".encode()).hexdigest()
+            snapshot["source_inputs_hash"] = source_inputs_hash
+        score_row = None if force_rescore else (await db.execute(select(CandidateScore).where(CandidateScore.application_id == application_id, CandidateScore.job_id == job_id, CandidateScore.scoring_version == scoring_config.scoring_version, CandidateScore.inputs_hash == inputs_hash))).scalar_one_or_none()
         if score_row is None:
             score_row = CandidateScore(company_id=application.company_id, application_id=application_id, job_id=job_id,
                 scoring_version=scoring_config.scoring_version, algorithm_version=scoring_config.algorithm_version,

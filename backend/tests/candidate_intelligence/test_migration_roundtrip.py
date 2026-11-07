@@ -23,7 +23,7 @@ ROUNDTRIP_DATABASE = "job_sentry_roundtrip_test"
 BASELINE_REVISION = "b7d2e9a4c1f5"
 PHASE4_INITIAL_REVISION = "c4e91a72b603"
 PHASE4_PRE_TYPED_REVISION = "d6f3a810bc42"
-PHASE4_HEAD = "f4a1b2c3d5e6"
+PHASE4_HEAD = "a91d6e4f2b70"
 
 
 def _connection_args(url: URL, database: str | None = None) -> dict:

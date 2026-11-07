@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, JSON, Numeric, String, Text, Uuid, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, Uuid, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import UserDefinedType
 from sqlalchemy.ext.compiler import compiles
@@ -155,7 +155,34 @@ class RankingHistory(BaseModel):
     config_snapshot: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False)
     config_hash: Mapped[str | None] = mapped_column(String(64))
     provider_snapshot: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False, default=dict)
+    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    embedding_model_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    llm_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    job_requirements_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scoring_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    eligibility: Mapped[str] = mapped_column(String(32), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(20), nullable=False)
     triggered_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
     __table_args__ = (UniqueConstraint("job_id", "run_id", "application_id", name="uq_ranking_history_run_application"),
                       Index("ix_ranking_history_job_created", "job_id", "created_at"),
-                      Index("ix_ranking_history_job_run_rank", "job_id", "run_id", "rank"))
+                      Index("ix_ranking_history_job_run_rank", "job_id", "run_id", "rank"),
+                      Index("ix_ranking_history_job_created_desc", "job_id", text("created_at DESC")))
+
+
+class RankingRun(BaseModel):
+    __tablename__ = "ranking_run"
+    run_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True)
+    job_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    counts: Mapped[dict[str, int]] = mapped_column(JsonType, nullable=False)
+    filters_applied: Mapped[dict[str, Any]] = mapped_column(JsonType, nullable=False)
+    scoring_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    embedding_model_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    llm_model: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    job_requirements_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scoring_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    triggered_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))

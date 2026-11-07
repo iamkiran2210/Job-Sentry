@@ -50,3 +50,9 @@ Validation: focused E3 file — 20 passed; full candidate-intelligence suite —
 Added isolated rank tie-break tests, deterministic shuffled-input and contiguous rank checks, 25-row filter-before-pagination coverage, and a DB-backed rank-run provenance/repeatability/job-scope test.
 Fixed ranking config snapshot construction to reference the scorer's exported category list; run metadata captures config/provider versions, tie keys, eligibility, and verification states.
 Validation: ranking goldens — 9 passed; full candidate-intelligence suite — 174 passed in 34.73s against disposable `job_sentry_test`.
+
+## E5 append-only history, ranking runs, and job lock (2026-11-08)
+Added revision `a91d6e4f2b70` after `f4a1b2c3d5e6`; it adds `ranking_run`, direct history provenance columns/backfills, append-only triggers, and a descending job/time index while keeping `e82c4a91d307` unchanged.
+The rank service now takes a transaction-scoped job advisory lock, validates scoped application IDs and scoring versions, writes run records, reuses current inputs/config unless forced, and persists new score rows for forced rescoring.
+Fixed the migration backfill to temporarily remove e82's update-only history trigger and restore it on downgrade; trigger, lock, reuse, and forced-rescore tests use `alembic_db`.
+Validation: E5 integration tests — 6 passed; migration round trip — 1 passed; Alembic fixture/drift — 2 passed; full candidate-intelligence suite — 181 passed in 38.02s.
