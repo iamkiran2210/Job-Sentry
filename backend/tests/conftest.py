@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlsplit
 from typing import AsyncGenerator
 import pytest
 import pytest_asyncio
@@ -21,6 +22,10 @@ from app.models.user import AuthProvider, User, UserRole
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a fresh, isolated database schema for each test."""
     test_db_url = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    parsed_url = urlsplit(test_db_url)
+    database_name = parsed_url.path.rsplit("/", 1)[-1]
+    if not ("sqlite" in parsed_url.scheme and database_name in {"", ":memory:"}) and "test" not in database_name.casefold():
+        raise RuntimeError("TEST_DATABASE_URL must point to a database whose name contains 'test'")
 
     if "sqlite" in test_db_url:
         engine = create_async_engine(
@@ -57,6 +62,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Provide an HTTP async test client with database dependency override."""
+
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
@@ -93,7 +99,9 @@ async def auth_headers(registered_user: User) -> dict:
     token = create_access_token(
         subject=str(registered_user.id),
         role=registered_user.role.value,
-        company_id=str(registered_user.company_id) if registered_user.company_id else None,
+        company_id=str(registered_user.company_id)
+        if registered_user.company_id
+        else None,
     )
     return {"Authorization": f"Bearer {token}"}
 
