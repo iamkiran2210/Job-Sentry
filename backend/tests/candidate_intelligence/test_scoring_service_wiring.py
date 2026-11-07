@@ -37,7 +37,7 @@ async def seeded_application(db_session, company_with_admin):
 @pytest.mark.asyncio
 async def test_score_application_persists_complete_score(db_session, company_with_admin, monkeypatch):
     app, job = await seeded_application(db_session, company_with_admin)
-    monkeypatch.setattr("app.modules.candidate_intelligence.service.build_embedding_provider", lambda cfg: SimpleNamespace(embed_text=lambda text: SimpleNamespace(vector=[1.0], content_hash="h", model_name="fake", model_version="1", dimension=1)))
+    monkeypatch.setattr("app.modules.candidate_intelligence.service.build_embedding_provider", lambda cfg: SimpleNamespace(embed_text=lambda text: SimpleNamespace(vector=[1.0] * cfg.embedding_dimension, content_hash="h", model_name="fake", model_version="1", dimension=cfg.embedding_dimension)))
     monkeypatch.setattr("app.modules.candidate_intelligence.service.build_llm_analyzer", lambda cfg: SimpleNamespace())
     await ScoringService.score_application(app.id, job.id, get_intelligence_settings(), as_of=date(2026, 1, 1), db=db_session)
     row = (await db_session.execute(select(CandidateScore).where(CandidateScore.application_id == app.id))).scalar_one()

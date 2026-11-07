@@ -22,6 +22,24 @@ class Vector(UserDefinedType):
     def __init__(self, dimension: int = 384): self.dimension = dimension
     def get_col_spec(self, **kw): return f"vector({self.dimension})"
 
+    def bind_processor(self, dialect):
+        if dialect.name != "postgresql":
+            return None
+        def serialize(value):
+            if value is None or isinstance(value, str):
+                return value
+            return "[" + ",".join(str(float(component)) for component in value) + "]"
+        return serialize
+
+    def result_processor(self, dialect, coltype):
+        if dialect.name != "postgresql":
+            return None
+        def deserialize(value):
+            if value is None or isinstance(value, list):
+                return value
+            return [float(component) for component in value.strip("[]").split(",")]
+        return deserialize
+
 
 @compiles(Vector, "sqlite")
 def _sqlite_vector(_type, _compiler, **_kw): return "JSON"
@@ -88,19 +106,33 @@ class ScoreEvidenceRecord(BaseModel):
     similarity: Mapped[float | None] = mapped_column(Numeric(10, 6))
     rationale: Mapped[str | None] = mapped_column(Text)
     supporting_quotes: Mapped[list] = mapped_column(JsonType, nullable=False, default=list)
-    grounded: Mapped[bool | None] = mapped_column(Boolean)
+    grounded: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
     error: Mapped[str | None] = mapped_column(String(120))
     model_name: Mapped[str | None] = mapped_column(String(120))
     input_hash: Mapped[str | None] = mapped_column(String(64))
-    is_proof: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_proof: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     embedding: Mapped[list | None] = mapped_column(Vector(384))
     embedding_model_name: Mapped[str | None] = mapped_column(String(120))
     embedding_model_version: Mapped[str | None] = mapped_column(String(80))
     embedding_dimension: Mapped[int | None] = mapped_column(Integer)
     embedded_text_hash: Mapped[str | None] = mapped_column(String(64))
+    embedding_model: Mapped[str | None] = mapped_column(String(120))
+    embedding_dim: Mapped[int | None] = mapped_column(Integer)
+    llm_model: Mapped[str | None] = mapped_column(String(120))
+    prompt_version: Mapped[str | None] = mapped_column(String(80))
+    source_start: Mapped[int | None] = mapped_column(Integer)
+    source_end: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (UniqueConstraint("score_id", "evidence_id", name="uq_score_evidence_id"),
+                      CheckConstraint("category IN ('skills', 'experience', 'projects', 'education', 'certifications')", name="ck_score_evidence_category_valid"),
+                      CheckConstraint("signal_type IN ('exact_skill_match', 'alias_skill_match', 'semantic_similarity', 'llm_relevance', 'github_language_signal', 'rule_based_match')", name="ck_score_evidence_signal_type_valid"),
                       CheckConstraint("value IS NULL OR (value >= 0 AND value <= 1)", name="ck_score_evidence_value_range"),
                       CheckConstraint("similarity IS NULL OR (similarity >= -1 AND similarity <= 1)", name="ck_score_evidence_similarity_range"),
+                      CheckConstraint("signal_type <> 'semantic_similarity' OR (similarity IS NOT NULL AND embedding_model IS NOT NULL AND embedding_model_version IS NOT NULL AND embedding_dim IS NOT NULL)", name="ck_score_evidence_semantic_metadata"),
+                      CheckConstraint("signal_type <> 'llm_relevance' OR (llm_model IS NOT NULL AND prompt_version IS NOT NULL AND input_hash IS NOT NULL)", name="ck_score_evidence_llm_metadata"),
+                      CheckConstraint("signal_type NOT IN ('exact_skill_match', 'alias_skill_match') OR (matched_term IS NOT NULL AND canonical_term IS NOT NULL)", name="ck_score_evidence_exact_terms"),
+                      CheckConstraint("source_start IS NULL OR source_end IS NULL OR source_end >= source_start", name="ck_score_evidence_source_range"),
+                      CheckConstraint("grounded IS NOT NULL", name="ck_score_evidence_grounded_not_null"),
+                      CheckConstraint("NOT (is_proof AND signal_type IN ('semantic_similarity', 'llm_relevance'))", name="ck_score_evidence_no_semantic_proof"),
                       Index("ix_score_evidence_application_category", "application_id", "category"))
 
 

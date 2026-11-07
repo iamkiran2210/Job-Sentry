@@ -28,3 +28,9 @@ Validation: `pytest -q --timeout=60 backend/tests/candidate_intelligence` — 54
 Implemented the scoring and ranking fixes plus verification/API/persistence closure work: ranking now filters before pagination and persists a full filtered order; versioned runs include provider/config provenance and immutable update protection; analysis remains read-only; endpoint data has Pydantic schemas; score/evidence metadata is explicitly stored with an additive `e82c4a91d307` migration; verification covers missing/ambiguous/malformed signals and GitHub URL format; phone numbering validation uses `phonenumbers` with an optional region setting.
 
 Validation this update: `python -m compileall -q app/modules/candidate_intelligence migrations/versions/e82c4a91d307_candidate_intelligence_typed_evidence.py` and `git diff --check` passed. Tests and database migration round trips were not run. Open: run the candidate-intelligence suite and DB migration checks; finish ranking run locking/idempotency and DB golden A-I; investigate the DSPy stall; verify the real pgvector deployment path; run configured lint/type checks.
+
+## E1 evidence constraint tests (2026-11-08)
+Added revision `f4a1b2c3d5e6` after immutable `e82c4a91d307`; it adds evidence metadata columns and named checks while leaving `vector` untouched on downgrade.
+Added Alembic-backed tests for category/signal allowlists, value and cosine ranges, proof/grounding rules, required semantic/LLM/exact metadata, source offsets, valid signal rows, and all evidence fields as columns.
+Fixed semantic credit to persist zero below threshold, populated model/prompt/embedding metadata, and added pgvector list/string conversion for asyncpg.
+Validation: focused evidence tests — 33 passed; Alembic migration round trip — 1 passed; full suite — 87 passed in 29.84s.

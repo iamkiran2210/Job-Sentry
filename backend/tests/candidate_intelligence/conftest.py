@@ -9,6 +9,7 @@ import asyncpg
 import pytest_asyncio
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import NullPool
 
 
 ALEMBIC_DATABASE = "job_sentry_phase4_alembic_test"
@@ -80,6 +81,7 @@ async def alembic_db() -> AsyncEngine:
         engine = create_async_engine(
             target_url,
             connect_args={"server_settings": {"search_path": "job_sentry,public"}},
+            poolclass=NullPool,
         )
         yield engine
     finally:

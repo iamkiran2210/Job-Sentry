@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 from datetime import date
+from types import MappingProxyType
 
 
 VerificationStatus = Literal["passed", "needs_review", "not_verified", "failed"]
@@ -13,13 +14,25 @@ VerificationStatus = Literal["passed", "needs_review", "not_verified", "failed"]
 @dataclass(frozen=True)
 class ScoringInputs:
     """Allowlisted immutable candidate/job data; identity/proxy fields have no slots."""
-    skills: tuple[dict[str, Any], ...]
-    experience: tuple[dict[str, Any], ...]
-    projects: tuple[dict[str, Any], ...]
-    education: tuple[dict[str, Any], ...]
-    certifications: tuple[dict[str, Any], ...]
-    requirements: tuple[dict[str, Any], ...]
+    skills: tuple[Mapping[str, Any], ...]
+    experience: tuple[Mapping[str, Any], ...]
+    projects: tuple[Mapping[str, Any], ...]
+    education: tuple[Mapping[str, Any], ...]
+    certifications: tuple[Mapping[str, Any], ...]
+    requirements: tuple[Mapping[str, Any], ...]
     as_of: date
+
+    def __post_init__(self) -> None:
+        for field_name in ("skills", "experience", "projects", "education", "certifications", "requirements"):
+            object.__setattr__(self, field_name, tuple(_freeze(item) for item in getattr(self, field_name)))
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
 
 
 @dataclass(frozen=True)
@@ -43,6 +56,14 @@ class ScoreEvidence:
     error: str | None = None
     model_name: str | None = None
     input_hash: str | None = None
+    embedding: tuple[float, ...] | None = None
+    embedding_model: str | None = None
+    embedding_model_version: str | None = None
+    embedding_dim: int | None = None
+    llm_model: str | None = None
+    prompt_version: str | None = None
+    source_start: int | None = None
+    source_end: int | None = None
 
 
 @dataclass(frozen=True)
