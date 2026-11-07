@@ -1,5 +1,5 @@
-M1 checkpoint
-Done: immutable allowlist DTO and pure Decimal helpers for experience, projects, education, certifications, skills and aggregation were added.
-Tests run: `pytest -q tests/candidate_intelligence` — 9 passed, including category fixtures and bounds.
-Open: ScoringService is not yet the sole persistence writer; category helpers are not fully wired; DB golden/sentinel/reproducibility tests remain.
-Next: resume M1 wiring, complete A–I/property/sentinel/DB tests, update matrix with passing evidence, and commit before M2.
+S1 checkpoint (incomplete)
+Done: added allowlist input builder, pure helper names, category formulas and Decimal aggregate helper; existing focused tests remain green.
+Tests run: `UV_CACHE_DIR=/tmp/uv-cache uv run --project backend pytest -q tests/candidate_intelligence` — 9 passed.
+Open: ScoringService is only a facade over old analysis; pure category formulas are not wired into persistence; DB golden/sentinel/A–I/reproducibility tests remain.
+Resume: S1. Wire one pure scorer path and read-only GETs, add smoke/sentinel/golden tests, then mark S1 done before S2.

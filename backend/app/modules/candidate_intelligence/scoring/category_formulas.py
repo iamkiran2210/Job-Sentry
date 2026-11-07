@@ -159,3 +159,11 @@ def certifications_result(required: list[dict], held: list[dict], aliases: dict[
         if canon(req.get("name", "")) in candidates:
             numerator += rw; used.append(str(req.get("id", req.get("name", ""))))
     return _result("certifications", numerator/denominator if denominator else None, weight, {"matched_weight": numerator, "listed_weight": denominator}, used, notes)
+
+
+# Stable names consumed by the scoring orchestration layer.
+score_skills = skills_result
+score_experience = experience_result
+score_projects = projects_result
+score_education = education_result
+score_certifications = certifications_result
