@@ -15,13 +15,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.core.config import settings
 from app.core.database import Base
 import app.models  # Ensure all models are registered with Base.metadata
+import app.ai_features.models  # noqa: F401 - register Phase 3 tables
+import app.modules.candidate_intelligence.models  # noqa: F401 - register Phase 4 tables
+from scripts.alembic_guard import enforce_database_target, resolve_database_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set sqlalchemy.url from our application settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Select the explicit migration URL first; the app setting is only a fallback.
+database_url = resolve_database_url(settings.DATABASE_URL)
+offline_mode = context.is_offline_mode()
+enforce_database_target(
+    database_url,
+    target=os.environ.get("ALEMBIC_TARGET"),
+    confirmation=os.environ.get("ALEMBIC_CONFIRM_DB"),
+    offline=offline_mode,
+)
+# Alembic's ConfigParser treats percent signs as interpolation markers.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
@@ -58,7 +70,7 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
     connect_args = {}
-    if "postgresql" in settings.DATABASE_URL:
+    if "postgresql" in database_url:
         connect_args["server_settings"] = {"search_path": "job_sentry,public"}
 
     connectable = async_engine_from_config(

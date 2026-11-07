@@ -177,23 +177,34 @@ pip install -r requirements.txt
 
 ### 3. Database Migrations
 
-Apply database migrations to the latest revision:
+Use the test wrapper for migrations against a disposable test database:
 
 ```bash
-alembic upgrade head
+# Set TEST_DATABASE_URL in the shell environment without echoing its value.
+backend/scripts/alembic_test.sh upgrade head
 ```
 
-To rollback a migration:
+The wrapper refuses to run unless `TEST_DATABASE_URL` is set, then sets `ALEMBIC_TARGET=test` and passes that URL to Alembic. `migrations/env.py` rejects targets whose database name does not contain `test` before opening a connection. Offline `--sql` generation is allowed without a database connection.
+
+### Running migrations safely
+
+Alembic uses `ALEMBIC_DATABASE_URL` when supplied; otherwise it falls back to the application `DATABASE_URL`. For every online operation, a database name containing `test` is allowed. A non-test database requires `ALEMBIC_CONFIRM_DB` to exactly match the database name. `ALEMBIC_TARGET=test` always requires a test-named database, even if a confirmation is provided.
+
+Run test migrations only through the wrapper:
 
 ```bash
-alembic downgrade -1
+backend/scripts/alembic_test.sh heads
+backend/scripts/alembic_test.sh upgrade head
+backend/scripts/alembic_test.sh check
 ```
 
-To generate a new auto-detected migration:
+For a deliberately approved non-test database operation, provide its exact database name and an explicit URL; never put the URL directly in a command transcript:
 
 ```bash
-alembic revision --autogenerate -m "describe_changes"
+ALEMBIC_DATABASE_URL="$APPROVED_DATABASE_URL" ALEMBIC_CONFIRM_DB="job_sentry" uv run --project backend alembic upgrade head
 ```
+
+Use the same guard for downgrade, stamp, current, and autogenerate operations. Review the resolved target before approving any non-test database action.
 
 ---
 
