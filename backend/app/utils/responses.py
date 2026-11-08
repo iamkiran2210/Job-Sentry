@@ -1,12 +1,14 @@
 from typing import Any, Generic, Optional, TypeVar
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from app.core.observability import current_request_id
 
 T = TypeVar("T")
 
 
 class ApiResponse(BaseModel, Generic[T]):
     """Standardized API response envelope."""
+
     success: bool
     message: str
     data: Optional[T] = None
@@ -38,5 +40,6 @@ def error_response(
         "message": message,
         "data": None,
         "errors": errors,
+        "request_id": current_request_id(),
     }
     return JSONResponse(status_code=status_code, content=payload)

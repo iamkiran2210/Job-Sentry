@@ -9,6 +9,7 @@ from app.core.exceptions import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
+from app.core.observability import StructuredRequestLoggingMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.companies.router import router as companies_router
 from app.modules.jobs.router import router as jobs_router
@@ -16,10 +17,10 @@ from app.modules.users.router import router as users_router
 from app.modules.candidate_intelligence.api.router import router as candidate_intelligence_router
 from app.modules.application_status.router import router as application_status_router
 from app.modules.analytics.router import router as analytics_router
+from app.modules.health.router import router as health_router
 
 from app.ai_features import startup_check
 from app.ai_features.api import router as ai_features_router
-from app.utils.responses import success_response
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,7 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+app.add_middleware(StructuredRequestLoggingMiddleware)
 
 # CORS Middleware
 origins = settings.ALLOWED_CORS_ORIGINS
@@ -76,16 +78,4 @@ app.include_router(ai_features_router, prefix=settings.API_V1_PREFIX)
 app.include_router(candidate_intelligence_router, prefix=settings.API_V1_PREFIX)
 app.include_router(application_status_router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics_router, prefix=settings.API_V1_PREFIX)
-
-
-@app.get("/health", tags=["Health"])
-async def health_check():
-    """Service health check endpoint."""
-    return success_response(
-        data={
-            "app": settings.APP_NAME,
-            "environment": settings.ENVIRONMENT,
-            "status": "healthy",
-        },
-        message="Service is operational",
-    )
+app.include_router(health_router)

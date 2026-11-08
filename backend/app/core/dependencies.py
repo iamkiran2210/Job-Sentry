@@ -1,6 +1,6 @@
 import uuid
 from typing import Callable, Optional
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -52,6 +53,9 @@ async def get_current_user(
     if not user:
         raise UnauthorizedException("User not found or account has been removed")
 
+    request.state.user_id = str(user.id)
+    request.state.company_id = str(user.company_id) if user.company_id else None
+
     return user
 
 
@@ -71,6 +75,7 @@ def require_role(*allowed_roles: UserRole) -> Callable:
     Role-based access control dependency factory.
     Enforces that current active user holds one of the specified roles.
     """
+
     async def role_checker(
         current_user: User = Depends(get_current_active_user),
     ) -> User:
