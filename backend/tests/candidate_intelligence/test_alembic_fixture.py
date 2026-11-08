@@ -18,11 +18,15 @@ async def test_alembic_db_fixture_builds_schema_through_migrations(alembic_db: A
         evidence_table = await connection.scalar(
             text("SELECT to_regclass('job_sentry.score_evidence') IS NOT NULL")
         )
+        explanation_table = await connection.scalar(
+            text("SELECT to_regclass('job_sentry.score_explanation') IS NOT NULL")
+        )
         vector_extension = await connection.scalar(
             text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
         )
-    assert version == "c2f6b1a8d904"
+    assert version == "d7f43ae83c10"
     assert evidence_table is True
+    assert explanation_table is True
     assert vector_extension is True
 
 

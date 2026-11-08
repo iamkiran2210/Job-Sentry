@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -22,11 +23,15 @@ from app.models.job_requirement import JobRequirement
 from app.modules.candidate_intelligence.config import get_intelligence_settings
 from app.modules.candidate_intelligence.evidence.matchers import exact_skill_evidence, llm_relevance_evidence, semantic_evidence
 from app.modules.candidate_intelligence.evidence.providers import build_embedding_provider, build_llm_analyzer
-from app.modules.candidate_intelligence.models import CandidateScore, RankingHistory, RankingRun, ScoreEvidenceRecord, VerificationResult
+from app.modules.candidate_intelligence.models import CandidateScore, RankingHistory, RankingRun, ScoreEvidenceRecord, ScoreExplanation, VerificationResult
+from app.modules.application_status.models import ApplicationStatusHistory
 from app.modules.candidate_intelligence.ranking.service import rank_rows
 from app.modules.candidate_intelligence.scoring import category_formulas as formulas
-from app.modules.candidate_intelligence.types import ScoringInputs
+from app.modules.candidate_intelligence.types import ScoringInputs, VerificationResultData
 from app.modules.candidate_intelligence.verification.checks import completeness_check, duplicate_signals, email_check, github_url_check, phone_check, portfolio_url_check, timeline_check, url_reachability_check
+from app.modules.candidate_intelligence.verification.checks import overall_status
+
+logger = logging.getLogger(__name__)
 
 
 def _json(value):
@@ -39,6 +44,80 @@ def _json(value):
             return str(item)
         return item
     return json.loads(json.dumps(plain(value), sort_keys=True, default=str))
+
+
+def _profile_detail(profile: dict) -> dict:
+    """Expose only job-relevant structured claims; identity and protected fields are excluded."""
+    allowed = {
+        "skills": ("name", "evidence"),
+        "employment": ("company", "title", "start_date", "end_date", "is_current", "description", "highlights"),
+        "education": ("institution", "degree", "field_of_study", "start_date", "end_date"),
+        "projects": ("name", "description", "role", "technologies", "url"),
+        "certifications": ("name", "issuer", "issue_date", "expiry_date", "credential_id"),
+    }
+    result = {}
+    for section, fields in allowed.items():
+        entries = profile.get(section)
+        if isinstance(entries, list):
+            result[section] = [
+                {field: item[field] for field in fields if field in item}
+                for item in entries if isinstance(item, dict)
+            ]
+        else:
+            result[section] = []
+    return result
+
+
+def _mask_email(value: str | None) -> str | None:
+    if not value:
+        return None
+    local, separator, domain = value.partition("@")
+    return f"{local[:1]}***@{domain}" if separator else "***"
+
+
+def _mask_phone(value: str | None) -> str | None:
+    return f"***{value[-4:]}" if value else None
+
+
+def _mask_verification_details(details: dict | None) -> dict:
+    """Keep verification metadata useful without returning contact values."""
+    masked = dict(details or {})
+    for key, value in tuple(masked.items()):
+        if not isinstance(value, str):
+            continue
+        lowered = key.casefold()
+        if "email" in lowered and "@" in value:
+            masked[key] = _mask_email(value)
+        elif "phone" in lowered or "e164" in lowered:
+            masked[key] = _mask_phone(value)
+    return masked
+
+
+def deterministic_score_summary(row: CandidateScore | None, evidence_rows: list[ScoreEvidenceRecord]) -> list[str]:
+    """Summarize persisted score fields only; does not invoke a model or re-score inputs."""
+    if row is None:
+        return []
+    counts: dict[str, int] = {}
+    for evidence in evidence_rows:
+        requirement = evidence.requirement_term or evidence.canonical_term or "unassigned"
+        key = f"{evidence.category}:{requirement}"
+        counts[key] = counts.get(key, 0) + 1
+    summaries = []
+    for category, detail in sorted((row.category_detail or {}).items()):
+        match = detail.get("match")
+        status = detail.get("status", "unknown")
+        count = sum(value for key, value in counts.items() if key.startswith(f"{category}:"))
+        summaries.append(f"{category}: match {match if match is not None else 'unknown'} ({status}); {count} evidence items.")
+    mandatory = [
+        str(item.get("requirement_name") or item.get("requirement_id") or "requirement")
+        for item in row.mandatory_results or []
+        if item.get("status") in {"not_met", "unknown"}
+    ]
+    if mandatory:
+        summaries.append("Mandatory requirements not met or unknown: " + ", ".join(mandatory) + ".")
+    if row.review_signals:
+        summaries.append("Review signals: " + ", ".join(row.review_signals) + ".")
+    return summaries
 
 
 def build_scoring_inputs(application, job, as_of: date, profile_data: dict | None = None, requirements: list | None = None) -> ScoringInputs:
@@ -164,16 +243,127 @@ class CandidateIntelligenceService:
         return result_set
 
     @staticmethod
-    async def analyze(db: AsyncSession, application_id: uuid.UUID):
-        app, _, _, _ = await CandidateIntelligenceService._bundle(db, application_id)
+    async def analyze(db: AsyncSession, application_id: uuid.UUID, *, pii_access: bool = False):
+        app, resume, profile_row, profile = await CandidateIntelligenceService._bundle(db, application_id)
+        candidate = await db.get(Candidate, app.candidate_id) if app.candidate_id else None
+        job = await db.get(Job, app.job_id)
         row = (await db.execute(select(CandidateScore).where(CandidateScore.application_id == app.id, CandidateScore.job_id == app.job_id).order_by(CandidateScore.created_at.desc()).limit(1))).scalar_one_or_none()
         verifications = (await db.execute(select(VerificationResult).where(VerificationResult.application_id == app.id).order_by(VerificationResult.created_at.desc()))).scalars().all()
         latest_verifications = {}
         for verification in verifications:
             latest_verifications.setdefault(verification.check_type, verification)
+        status_rows = (await db.execute(
+            select(ApplicationStatusHistory)
+            .where(ApplicationStatusHistory.application_id == app.id)
+            .order_by(ApplicationStatusHistory.created_at.desc(), ApplicationStatusHistory.id.desc())
+            .limit(20)
+        )).scalars().all()
         evidence_rows = []
+        explanation_row = None
         if row:
             evidence_rows = (await db.execute(select(ScoreEvidenceRecord).where(ScoreEvidenceRecord.score_id == row.id).order_by(ScoreEvidenceRecord.created_at))).scalars().all()
+            explanation_row = (await db.execute(
+                select(ScoreExplanation)
+                .where(ScoreExplanation.candidate_score_id == row.id)
+                .order_by(ScoreExplanation.created_at.desc(), ScoreExplanation.id.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+        ranking = None
+        if row:
+            ranking = (await db.execute(
+                select(RankingHistory)
+                .where(RankingHistory.application_id == app.id, RankingHistory.job_id == app.job_id)
+                .order_by(RankingHistory.created_at.desc(), RankingHistory.id.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+        contact = profile.get("contact") if isinstance(profile.get("contact"), dict) else {}
+        raw_email = (contact.get("email") or {}).get("value") if isinstance(contact.get("email"), dict) else None
+        raw_phone = (contact.get("phone") or {}).get("value") if isinstance(contact.get("phone"), dict) else None
+        email = (candidate.email if candidate and candidate.email else raw_email)
+        phone = (candidate.phone if candidate and candidate.phone else raw_phone)
+        full_name = candidate.full_name if candidate and candidate.full_name else None
+        if not full_name and isinstance(profile.get("full_name"), dict):
+            full_name = profile["full_name"].get("value")
+        email_out = email if pii_access else _mask_email(email)
+        phone_out = phone if pii_access else _mask_phone(phone)
+        links = {}
+        for key in ("portfolio_url", "github_url"):
+            value = contact.get(key)
+            links[key] = value.get("value") if isinstance(value, dict) else None
+        candidate_detail = {
+            "id": candidate.id if candidate else app.candidate_id,
+            "display_name": full_name,
+            "email": email_out,
+            "phone": phone_out,
+            "links": links,
+            "profile": _profile_detail(profile),
+        }
+        resume_detail = None
+        if resume:
+            clean_name = str(resume.original_filename or "resume")
+            clean_name = clean_name.replace("\\", "/").split("/")[-1]
+            clean_name = "".join(char for char in clean_name if char.isprintable())[:255] or "resume"
+            resume_detail = {
+                "file_name": clean_name,
+                "content_type": resume.content_type,
+                "size_bytes": resume.size_bytes,
+                "page_count": profile_row.page_count if profile_row else None,
+                "uploaded_at": resume.created_at.isoformat(),
+                "parse_status": resume.status,
+                "parser_version": profile_row.extraction_method if profile_row else None,
+                "extraction_version": profile_row.schema_version if profile_row else None,
+                "content_hash_prefix": (resume.sha256 or "")[:12],
+            }
+        checks = [
+            {"check_type": v.check_type, "status": v.status, "signal": v.signal,
+             "details": _mask_verification_details(v.details)}
+            for v in latest_verifications.values()
+        ]
+        verification_status = overall_status([
+            VerificationResultData(v.check_type, v.status, v.signal, _mask_verification_details(v.details))
+            for v in latest_verifications.values()
+        ])
+        grouped_evidence: dict[str, dict[str, Any]] = {}
+        for evidence in evidence_rows:
+            requirement = evidence.requirement_term or evidence.canonical_term or "unassigned"
+            key = f"{evidence.category}:{requirement}"
+            group = grouped_evidence.setdefault(key, {"category": evidence.category, "requirement": requirement, "items": []})
+            source = evidence.evidence_data if isinstance(evidence.evidence_data, dict) else {}
+            snippet = (source.get("supporting_quotes") or [None])[0] or source.get("matched_term") or source.get("rationale")
+            group["items"].append({
+                "evidence_id": evidence.evidence_id,
+                "signal_type": evidence.signal_type,
+                "snippet": snippet,
+                "source_location": evidence.source_location,
+                "value": float(evidence.value) if evidence.value is not None else None,
+                "is_proof": bool(evidence.is_proof),
+                "versions": {
+                    "model_version": evidence.model_version,
+                    "embedding_model": evidence.embedding_model,
+                    "embedding_model_version": evidence.embedding_model_version,
+                    "llm_model": evidence.llm_model,
+                    "prompt_version": evidence.prompt_version,
+                },
+            })
+        score_detail = None
+        if row:
+            score_detail = {
+                "total": float(row.score) if row.score is not None else None,
+                "lower_bound": float(row.score_lower_bound) if row.score_lower_bound is not None else None,
+                "upper_bound": float(row.score_upper_bound) if row.score_upper_bound is not None else None,
+                "data_completeness": float(row.data_completeness),
+                "eligibility": row.eligibility,
+                "mandatory_results": row.mandatory_results,
+                "review_signals": row.review_signals,
+                "categories": row.category_detail,
+                "rank": ranking.rank if ranking else None,
+                "ranking_run_id": ranking.run_id if ranking else None,
+            }
+        history = [{
+            "id": item.id, "from_status": item.from_status, "to_status": item.to_status,
+            "actor_type": item.actor_type, "actor_user_id": item.actor_user_id,
+            "reason": item.reason, "created_at": item.created_at.isoformat(),
+        } for item in status_rows]
         return {"application_id": str(app.id), "status_note": "scored" if row else "not_scored", "score_id": str(row.id) if row else None,
                 "score": float(row.score) if row and row.score is not None else None,
                 "score_percent": float(row.score) if row and row.score is not None else None,
@@ -186,10 +376,22 @@ class CandidateIntelligenceService:
                 "evidence": [x.evidence_data for x in evidence_rows],
                 "analysis_summary": {"text": "Candidate analysis is not scored yet." if row is None else "Score reflects available job-relevant evidence.",
                     "interpretation": "Scores and public profile metadata are decision-support signals; they do not verify skill, employment, or identity."},
-                "verification": [{"check_type": v.check_type, "status": v.status, "signal": v.signal, "details": v.details} for v in latest_verifications.values()],
+                "verification": checks,
                 "scoring_version": row.scoring_version if row else None,
                 "algorithm_version": row.algorithm_version if row else None,
-                "config_snapshot": row.config_snapshot if row else None}
+                "config_snapshot": row.config_snapshot if row else None,
+                "candidate": candidate_detail,
+                "resume": resume_detail,
+                "application": {"id": app.id, "job_id": app.job_id, "job_title": job.title if job else "", "status": app.status, "status_history": history},
+                "verification_detail": {"overall_status": verification_status, "checks": checks},
+                "score_detail": score_detail,
+                "evidence_groups": list(grouped_evidence.values()),
+                "explanation": {
+                    "deterministic_summary": deterministic_score_summary(row, evidence_rows),
+                    "ai_summary": explanation_row.content if explanation_row and explanation_row.status == "available" else None,
+                    "ai_status": explanation_row.status if explanation_row else "unavailable",
+                    "disclaimer": "AI-generated from the evidence above. It does not change the score and is not a hiring decision.",
+                }}
 
     @staticmethod
     async def rank(db: AsyncSession, job_id: uuid.UUID, user_id: uuid.UUID, filters: dict):
@@ -218,6 +420,16 @@ class CandidateIntelligenceService:
             score = await ScoringService.score_application(app.id, job.id, cfg, as_of=date.today(), db=db,
                                                            force_rescore=bool(filters.get("force_rescore", False)))
             scores_by_app[str(app.id)] = score
+            if cfg.llm_provider == "pydantic_ai":
+                try:
+                    from app.ai_features.resumes.tasks import generate_score_explanation_task
+
+                    generate_score_explanation_task.apply_async(args=[str(score.id)], countdown=1)
+                except Exception as exc:
+                    logger.warning(
+                        "Could not queue score explanation",
+                        extra={"error_type": type(exc).__name__},
+                    )
             checks = (await db.execute(select(VerificationResult).where(VerificationResult.application_id == app.id).order_by(VerificationResult.created_at.desc()))).scalars().all()
             latest = {}
             for check in checks:

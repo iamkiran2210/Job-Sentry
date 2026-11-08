@@ -36,6 +36,60 @@ class CategoryAnalysis(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class CandidateDetail(BaseModel):
+    id: UUID | None
+    display_name: str | None
+    email: str | None
+    phone: str | None
+    links: dict[str, str | None]
+    profile: dict[str, Any]
+
+
+class ResumeDetail(BaseModel):
+    file_name: str
+    content_type: str
+    size_bytes: int
+    page_count: int | None
+    uploaded_at: str
+    parse_status: str
+    parser_version: str | None
+    extraction_version: str | int | None
+    content_hash_prefix: str
+
+
+class ApplicationDetail(BaseModel):
+    id: UUID
+    job_id: UUID
+    job_title: str
+    status: str
+    status_history: list[dict[str, Any]]
+
+
+class ScoreDetail(BaseModel):
+    total: float | None
+    lower_bound: float | None
+    upper_bound: float | None
+    data_completeness: float
+    eligibility: Eligibility
+    mandatory_results: list[dict[str, Any]]
+    review_signals: list[str]
+    categories: dict[str, CategoryAnalysis]
+    rank: int | None
+    ranking_run_id: UUID | None
+
+
+class VerificationDetail(BaseModel):
+    overall_status: VerificationStatus
+    checks: list[VerificationCheck]
+
+
+class ExplanationDetail(BaseModel):
+    deterministic_summary: list[str]
+    ai_summary: dict[str, Any] | None
+    ai_status: Literal["available", "pending", "failed", "unavailable"]
+    disclaimer: str
+
+
 class AnalysisData(BaseModel):
     application_id: UUID
     status_note: str | None = None
@@ -55,6 +109,13 @@ class AnalysisData(BaseModel):
     scoring_version: str | None
     algorithm_version: str | None
     config_snapshot: dict[str, Any] | None
+    candidate: CandidateDetail
+    resume: ResumeDetail | None
+    application: ApplicationDetail
+    verification_detail: VerificationDetail
+    score_detail: ScoreDetail | None
+    evidence_groups: list[dict[str, Any]]
+    explanation: ExplanationDetail
 
 
 class RankRequest(BaseModel):

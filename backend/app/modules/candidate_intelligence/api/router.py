@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Body, Depends, Query
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,7 +68,12 @@ async def analyze_application(application_id: uuid.UUID, db: AsyncSession = Depe
     if app is None:
         raise NotFoundException("Application not found")
     await JobsService.get_job(db, user, app.job_id)
-    return success_response(data=await CandidateIntelligenceService.analyze(db, app.id), message="Candidate analysis")
+    pii_access = user.company_id == app.company_id
+    analysis = await CandidateIntelligenceService.analyze(db, app.id, pii_access=pii_access)
+    return success_response(
+        data=jsonable_encoder(analysis),
+        message="Candidate analysis",
+    )
 
 
 @router.post("/jobs/{job_id}/rank", response_model=RankResponse,

@@ -186,3 +186,20 @@ class RankingRun(BaseModel):
     job_requirements_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     scoring_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     triggered_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class ScoreExplanation(BaseModel):
+    __tablename__ = "score_explanation"
+    candidate_score_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("candidate_scores.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    generator_model: Mapped[str | None] = mapped_column(String(120))
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    error: Mapped[str | None] = mapped_column(String(120))
+    __table_args__ = (
+        CheckConstraint("status IN ('available', 'pending', 'failed', 'unavailable')", name="ck_score_explanation_status_valid"),
+        Index("ix_score_explanation_score_created", "candidate_score_id", "created_at"),
+    )
