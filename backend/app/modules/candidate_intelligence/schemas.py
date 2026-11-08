@@ -90,6 +90,29 @@ class ExplanationDetail(BaseModel):
     disclaimer: str
 
 
+class CompareRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    application_ids: list[UUID] = Field(min_length=2, max_length=4)
+
+    @model_validator(mode="after")
+    def unique_application_ids(self):
+        if len(set(self.application_ids)) != len(self.application_ids):
+            raise ValueError("application_ids must be unique")
+        return self
+
+
+class ComparisonData(BaseModel):
+    applications: list[dict[str, Any]]
+    categories: dict[str, list[dict[str, Any]]]
+    skill_coverage: list[dict[str, Any]]
+    mandatory_coverage: list[dict[str, Any]]
+    differences: list[dict[str, Any]]
+    disclaimers: list[str]
+
+
+CompareResponse = ApiResponse[ComparisonData]
+
+
 class AnalysisData(BaseModel):
     application_id: UUID
     status_note: str | None = None

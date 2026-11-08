@@ -13,9 +13,12 @@ from app.core.database import get_db
 from app.core.exceptions import NotFoundException
 from app.models.user import User
 from app.modules.candidate_intelligence.models import RankingHistory, RankingRun
+from app.modules.candidate_intelligence.comparison import compare_applications
 from app.modules.candidate_intelligence.ranking.service import rank_rows
 from app.modules.candidate_intelligence.schemas import (
     AnalysisResponse,
+    CompareRequest,
+    CompareResponse,
     RankRequest,
     RankResponse,
     RankingHistoryResponse,
@@ -30,6 +33,19 @@ from app.modules.jobs.service import JobsService
 from app.utils.responses import success_response
 
 router = APIRouter(tags=["Candidate Intelligence"])
+
+
+@router.post("/jobs/{job_id}/compare", response_model=CompareResponse,
+             summary="Compare persisted evidence for applications in one job")
+async def compare_job_applications(
+    job_id: uuid.UUID,
+    request: CompareRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_active_user),
+):
+    await JobsService.get_job(db, user, job_id)
+    result = await compare_applications(db, job_id, user.company_id, request.application_ids)
+    return success_response(data=jsonable_encoder(result), message="Application evidence comparison")
 
 
 def _mask_contact_details(check_type: str, details: dict) -> dict:
