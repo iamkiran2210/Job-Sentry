@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, require_company_admin
 from app.models.user import User
 from app.modules.auth.service import AuthService
 from app.schemas.auth import (
@@ -27,8 +27,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 async def register(
     request: UserRegisterRequest,
     db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_company_admin),
 ):
-    user = await AuthService.register_user(db, request)
+    user = await AuthService.register_user(db, request, company_id=current_admin.company_id)
     return success_response(
         data=UserResponse.model_validate(user).model_dump(mode="json"),
         message="User registered successfully",
@@ -81,8 +82,9 @@ async def refresh_token(
 async def logout(
     request: LogoutRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    await AuthService.logout_user(db, request.refresh_token)
+    await AuthService.logout_user(db, request.refresh_token, user_id=current_user.id)
     return success_response(
         data=None,
         message="Logged out successfully",
@@ -99,8 +101,11 @@ async def logout(
 async def google_auth(
     request: GoogleOAuthRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    token_response, _ = await AuthService.authenticate_google(db, request)
+    token_response, _ = await AuthService.authenticate_google(
+        db, request, expected_user_id=current_user.id, expected_email=current_user.email
+    )
     return success_response(
         data=token_response.model_dump(mode="json"),
         message="Google authentication successful",

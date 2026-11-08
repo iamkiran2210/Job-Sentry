@@ -3,18 +3,18 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password
 
 
 @pytest.mark.asyncio
-async def test_register_success(client: AsyncClient):
+async def test_register_success(client: AsyncClient, admin_headers):
     """Test successful user registration with valid data."""
     payload = {
         "name": "Rahul Sharma",
         "email": "rahul@example.com",
         "password": "StrongPassword123!",
     }
-    response = await client.post("/api/v1/auth/register", json=payload)
+    response = await client.post("/api/v1/auth/register", json=payload, headers=admin_headers)
     assert response.status_code == 201
 
     data = response.json()
@@ -30,14 +30,29 @@ async def test_register_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_register_duplicate_email(client: AsyncClient, registered_user):
+async def test_registration_requires_company_admin(client: AsyncClient, auth_headers):
+    payload = {
+        "name": "Recruiter Created",
+        "email": "new-recruiter@example.com",
+        "password": "StrongPassword123!",
+    }
+    anonymous = await client.post("/api/v1/auth/register", json=payload)
+    recruiter = await client.post(
+        "/api/v1/auth/register", json=payload, headers=auth_headers
+    )
+    assert anonymous.status_code == 401
+    assert recruiter.status_code in {403, 404}
+
+
+@pytest.mark.asyncio
+async def test_register_duplicate_email(client: AsyncClient, registered_user, admin_headers):
     """Test registration failure when email already exists."""
     payload = {
         "name": "Another Person",
         "email": registered_user.email,
         "password": "ValidPassword123!",
     }
-    response = await client.post("/api/v1/auth/register", json=payload)
+    response = await client.post("/api/v1/auth/register", json=payload, headers=admin_headers)
     assert response.status_code == 409
     data = response.json()
     assert data["success"] is False
@@ -45,14 +60,14 @@ async def test_register_duplicate_email(client: AsyncClient, registered_user):
 
 
 @pytest.mark.asyncio
-async def test_register_invalid_email(client: AsyncClient):
+async def test_register_invalid_email(client: AsyncClient, admin_headers):
     """Test registration failure on malformed email address."""
     payload = {
         "name": "Invalid Email",
         "email": "not-an-email",
         "password": "StrongPassword123!",
     }
-    response = await client.post("/api/v1/auth/register", json=payload)
+    response = await client.post("/api/v1/auth/register", json=payload, headers=admin_headers)
     assert response.status_code == 422
     data = response.json()
     assert data["success"] is False
@@ -69,14 +84,16 @@ async def test_register_invalid_email(client: AsyncClient):
         ("NoSpecialChar123", "missing special char"),
     ],
 )
-async def test_register_weak_password(client: AsyncClient, weak_password: str, reason: str):
+async def test_register_weak_password(
+    client: AsyncClient, weak_password: str, reason: str, admin_headers
+):
     """Test registration failure on passwords not meeting strength requirements."""
     payload = {
         "name": "Weak Pass User",
         "email": f"user_{reason.replace(' ', '_')}@example.com",
         "password": weak_password,
     }
-    response = await client.post("/api/v1/auth/register", json=payload)
+    response = await client.post("/api/v1/auth/register", json=payload, headers=admin_headers)
     assert response.status_code == 422
     data = response.json()
     assert data["success"] is False
@@ -112,6 +129,38 @@ async def test_login_incorrect_password(client: AsyncClient, registered_user):
     data = response.json()
     assert data["success"] is False
     assert "invalid email or password" in data["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_login_failure_is_generic_for_unknown_and_provider_accounts(
+    client: AsyncClient, db_session, caplog
+):
+    from app.models.user import AuthProvider, User, UserRole
+
+    db_session.add(
+        User(
+            name="OAuth Account",
+            email="oauth-only@example.com",
+            password_hash=None,
+            role=UserRole.RECRUITER,
+            auth_provider=AuthProvider.GOOGLE,
+            is_active=True,
+            is_verified=True,
+        )
+    )
+    await db_session.commit()
+    caplog.set_level("INFO")
+    first = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "missing@example.com", "password": "MustNotBeLogged123!"},
+    )
+    second = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "oauth-only@example.com", "password": "MustNotBeLogged123!"},
+    )
+    assert first.status_code == second.status_code == 401
+    assert first.json()["message"] == second.json()["message"]
+    assert "MustNotBeLogged123!" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -189,6 +238,7 @@ async def test_logout(client: AsyncClient, registered_user):
     logout_res = await client.post(
         "/api/v1/auth/logout",
         json={"refresh_token": refresh_token},
+        headers={"Authorization": f"Bearer {login_res.json()['data']['access_token']}"},
     )
     assert logout_res.status_code == 200
     assert logout_res.json()["success"] is True
@@ -202,6 +252,45 @@ async def test_logout(client: AsyncClient, registered_user):
 
 
 @pytest.mark.asyncio
+async def test_logout_requires_authentication(client: AsyncClient):
+    response = await client.post("/api/v1/auth/logout", json={"refresh_token": "x"})
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_cannot_revoke_another_users_refresh_token(
+    client: AsyncClient, db_session, auth_headers
+):
+    from app.models.user import AuthProvider, User, UserRole
+
+    other = User(
+        name="Other Recruiter",
+        email="other-recruiter@example.com",
+        password_hash=hash_password("ValidPass123!"),
+        role=UserRole.RECRUITER,
+        auth_provider=AuthProvider.EMAIL,
+        is_active=True,
+        is_verified=True,
+    )
+    db_session.add(other)
+    await db_session.commit()
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": other.email, "password": "ValidPass123!"},
+    )
+    other_refresh = login.json()["data"]["refresh_token"]
+    await client.post(
+        "/api/v1/auth/logout",
+        json={"refresh_token": other_refresh},
+        headers=auth_headers,
+    )
+    refresh = await client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": other_refresh}
+    )
+    assert refresh.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_unauthorized_access(client: AsyncClient):
     """Test protected endpoints reject requests lacking authentication."""
     response = await client.get("/api/v1/auth/me")
@@ -211,46 +300,74 @@ async def test_unauthorized_access(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_google_oauth_flow(client: AsyncClient):
-    """Test Google OAuth login and user creation with mocked Google verification."""
+async def test_google_oauth_flow(client: AsyncClient, registered_user, auth_headers):
+    """Test authenticated Google identity linking with mocked verification."""
     mock_google_payload = {
-        "email": "googleuser@example.com",
+        "email": registered_user.email,
         "name": "Google User",
         "email_verified": True,
         "iss": "accounts.google.com",
         "sub": "google-user-12345",
     }
 
-    with patch("app.modules.auth.service.verify_google_id_token", return_value=mock_google_payload):
+    with patch(
+        "app.modules.auth.service.verify_google_id_token",
+        return_value=mock_google_payload,
+    ):
         response = await client.post(
             "/api/v1/auth/google",
             json={"id_token": "valid-mock-google-token"},
+            headers=auth_headers,
         )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["user"]["email"] == "googleuser@example.com"
-        assert data["data"]["user"]["auth_provider"] == "google"
+        assert data["data"]["user"]["email"] == registered_user.email
         assert "access_token" in data["data"]
         assert "refresh_token" in data["data"]
 
 
 @pytest.mark.asyncio
-async def test_google_oauth_unverified_email(client: AsyncClient):
+async def test_google_oauth_unverified_email(client: AsyncClient, registered_user, auth_headers):
     """Test Google OAuth rejects unverified email addresses."""
     mock_google_payload = {
-        "email": "unverified@example.com",
+        "email": registered_user.email,
         "name": "Unverified User",
         "email_verified": False,
         "iss": "accounts.google.com",
     }
 
-    with patch("app.modules.auth.service.verify_google_id_token", return_value=mock_google_payload):
+    with patch(
+        "app.modules.auth.service.verify_google_id_token",
+        return_value=mock_google_payload,
+    ):
         response = await client.post(
             "/api/v1/auth/google",
             json={"id_token": "unverified-google-token"},
+            headers=auth_headers,
         )
         assert response.status_code == 401
         data = response.json()
         assert data["success"] is False
         assert "not verified" in data["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_google_link_cannot_issue_tokens_for_another_account(
+    client: AsyncClient, registered_user, auth_headers
+):
+    with patch(
+        "app.modules.auth.service.verify_google_id_token",
+        return_value={
+            "email": "someone-else@example.com",
+            "name": "Other Account",
+            "email_verified": True,
+        },
+    ):
+        response = await client.post(
+            "/api/v1/auth/google",
+            json={"id_token": "valid-mock-google-token"},
+            headers=auth_headers,
+        )
+    assert response.status_code == 403
+    assert "someone-else@example.com" not in response.text

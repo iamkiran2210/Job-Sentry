@@ -10,6 +10,7 @@ from app.core.exceptions import (
     UnauthorizedException,
 )
 from app.core.security import (
+    DUMMY_PASSWORD_HASH,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -34,7 +35,9 @@ class AuthService:
     """Service handling user registration, authentication, token rotation, and Google OAuth."""
 
     @staticmethod
-    async def register_user(db: AsyncSession, request: UserRegisterRequest) -> User:
+    async def register_user(
+        db: AsyncSession, request: UserRegisterRequest, *, company_id: uuid.UUID
+    ) -> User:
         """Register a new user with email and password."""
         email_normalized = request.email.lower().strip()
 
@@ -53,6 +56,7 @@ class AuthService:
             password_hash=password_hashed,
             role=UserRole.RECRUITER,
             auth_provider=AuthProvider.EMAIL,
+            company_id=company_id,
             is_active=True,
             is_verified=False,
         )
@@ -70,18 +74,18 @@ class AuthService:
         user = result.scalar_one_or_none()
 
         if not user:
+            verify_password(request.password, DUMMY_PASSWORD_HASH)
             raise UnauthorizedException("Invalid email or password")
 
         if not user.password_hash:
-            raise UnauthorizedException(
-                f"This account was registered using {user.auth_provider.value}. Please log in using that provider."
-            )
+            verify_password(request.password, DUMMY_PASSWORD_HASH)
+            raise UnauthorizedException("Invalid email or password")
 
         if not verify_password(request.password, user.password_hash):
             raise UnauthorizedException("Invalid email or password")
 
         if not user.is_active:
-            raise ForbiddenException("User account is deactivated")
+            raise UnauthorizedException("Invalid email or password")
 
         # Issue tokens
         access_token = create_access_token(
@@ -187,12 +191,17 @@ class AuthService:
         )
 
     @staticmethod
-    async def logout_user(db: AsyncSession, refresh_token: Optional[str] = None) -> None:
+    async def logout_user(
+        db: AsyncSession, refresh_token: Optional[str] = None, *, user_id: uuid.UUID
+    ) -> None:
         """Revoke the given refresh token to invalidate the session."""
         if refresh_token:
             token_hash = hash_token(refresh_token)
             result = await db.execute(
-                select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+                select(RefreshToken).where(
+                    RefreshToken.token_hash == token_hash,
+                    RefreshToken.user_id == user_id,
+                )
             )
             token_record = result.scalar_one_or_none()
             if token_record and token_record.revoked_at is None:
@@ -200,44 +209,38 @@ class AuthService:
                 await db.commit()
 
     @staticmethod
-    async def authenticate_google(db: AsyncSession, request: GoogleOAuthRequest) -> Tuple[TokenResponse, User]:
-        """Authenticate or register user via verified Google ID token."""
+    async def authenticate_google(
+        db: AsyncSession,
+        request: GoogleOAuthRequest,
+        *,
+        expected_user_id: uuid.UUID,
+        expected_email: str,
+    ) -> Tuple[TokenResponse, User]:
+        """Issue fresh tokens after verifying the authenticated user's Google email."""
         id_info = verify_google_id_token(request.id_token)
 
         email = id_info.get("email")
         if not email:
-            raise UnauthorizedException("Google token does not contain an email address")
+            raise UnauthorizedException(
+                "Google token does not contain an email address"
+            )
 
         email_verified = id_info.get("email_verified", False)
         if not email_verified:
             raise UnauthorizedException("Google email address is not verified")
 
         email_normalized = email.lower().strip()
-        name = id_info.get("name", email_normalized.split("@")[0]).strip()
-
-        result = await db.execute(select(User).where(User.email == email_normalized))
+        if email_normalized != expected_email.lower().strip():
+            raise ForbiddenException("Google account does not match the authenticated account")
+        result = await db.execute(select(User).where(User.id == expected_user_id))
         user = result.scalar_one_or_none()
 
-        if user:
-            if not user.is_active:
-                raise ForbiddenException("User account is deactivated")
-            # Account linking: mark verified if Google has verified the email
-            if not user.is_verified:
-                user.is_verified = True
-        else:
-            # Create new user via Google OAuth
-            user = User(
-                name=name,
-                email=email_normalized,
-                password_hash=None,
-                role=UserRole.RECRUITER,
-                auth_provider=AuthProvider.GOOGLE,
-                is_active=True,
-                is_verified=True,
-            )
-            db.add(user)
-            await db.flush()
-
+        if not user or not user.is_active:
+            raise ForbiddenException("Authenticated account is unavailable")
+        # This authenticated operation links a verified Google identity; it cannot create
+        # an account or issue a session for a different account.
+        if not user.is_verified:
+            user.is_verified = True
         # Issue tokens
         access_token = create_access_token(
             subject=str(user.id),

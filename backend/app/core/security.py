@@ -17,6 +17,7 @@ from app.core.exceptions import UnauthorizedException
 # Argon2 password hasher instance
 pwd_hasher = PasswordHasher()
 logger = logging.getLogger(__name__)
+DUMMY_PASSWORD_HASH = pwd_hasher.hash("job-sentry-invalid-login-timing-padding")
 
 
 def hash_password(password: str) -> str:

@@ -64,3 +64,24 @@ async def test_security_headers_are_added_to_json_responses():
 async def test_cors_rejects_origins_outside_the_configured_list(client):
     response = await client.get("/health", headers={"Origin": "http://localhost:9999"})
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_only_documented_auth_and_liveness_routes_are_public():
+    from app.main import app
+
+    public_paths = {
+        "/health",
+        "/ready",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+    }
+    schema = app.openapi()
+    missing_security = sorted(
+        f"{method.upper()} {path}"
+        for path, operations in schema["paths"].items()
+        for method, operation in operations.items()
+        if method in {"get", "post", "put", "patch", "delete"}
+        and path not in public_paths
+        and not operation.get("security")
+    )
+    assert not missing_security, f"Routes missing authentication: {missing_security}"
