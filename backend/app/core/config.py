@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/job_sentry",
         description="Async PostgreSQL connection URL (asyncpg)",
     )
+    REDIS_URL: str = "redis://localhost:6379/0"
+    READY_REQUIRE_WORKER: bool = False
+    GIT_COMMIT: str = "unknown"
+    LOG_LEVEL: str = "INFO"
 
     # JWT Authentication
     JWT_SECRET: str = Field(
