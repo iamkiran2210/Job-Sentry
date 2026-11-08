@@ -58,3 +58,9 @@ async def test_security_headers_are_added_to_json_responses():
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_cors_rejects_origins_outside_the_configured_list(client):
+    response = await client.get("/health", headers={"Origin": "http://localhost:9999"})
+    assert "access-control-allow-origin" not in response.headers
