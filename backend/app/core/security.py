@@ -50,16 +50,16 @@ def create_access_token(
     Contains subject, role, company_id, token type, and expiration.
     """
     now = datetime.now(timezone.utc)
-    if expires_delta:
-        expire = now + expires_delta
-    else:
-        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    requested_expiry = expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = now + min(requested_expiry, timedelta(minutes=15))
 
     payload = {
         "sub": str(subject),
         "role": role,
         "company_id": str(company_id) if company_id else None,
         "type": "access",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
@@ -76,14 +76,14 @@ def create_refresh_token(
     Returns (token_str, expiry_datetime_utc).
     """
     now = datetime.now(timezone.utc)
-    if expires_delta:
-        expire = now + expires_delta
-    else:
-        expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    requested_expiry = expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = now + min(requested_expiry, timedelta(days=7))
 
     payload = {
         "sub": str(subject),
         "type": "refresh",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
         "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
@@ -102,7 +102,9 @@ def decode_token(token: str) -> Dict[str, Any]:
             token,
             settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
-            options={"require": ["exp", "sub", "type"]},
+            options={"require": ["exp", "iat", "sub", "type", "iss", "aud"]},
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
         )
         return payload
     except jwt.ExpiredSignatureError:

@@ -1,7 +1,7 @@
 import json
 from typing import List, Union
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Job Sentry"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    DOCS_ENABLED: bool = True
     API_V1_PREFIX: str = "/api/v1"
 
     # Database
@@ -34,8 +35,11 @@ class Settings(BaseSettings):
         default="replace-with-a-very-secure-random-secret-key-at-least-32-chars",
         description="Secret key for JWT token signing and verification",
     )
+
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ISSUER: str = "job-sentry"
+    JWT_AUDIENCE: str = "job-sentry-api"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Google OAuth
@@ -46,7 +50,26 @@ class Settings(BaseSettings):
     AI_REQUIREMENTS_PROVIDER: str = ""
 
     # CORS
-    ALLOWED_CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:5173"]
+    ALLOWED_CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ]
+
+    @model_validator(mode="after")
+    def enforce_production_settings(self):
+        if self.ENVIRONMENT.casefold() == "production":
+            secret = self.JWT_SECRET.strip()
+            if len(secret) < 32 or secret.casefold() in {
+                "changeme",
+                "change-me",
+                "secret",
+                "password",
+                "replace-with-a-very-secure-random-secret-key-at-least-32-chars",
+            }:
+                raise ValueError("JWT_SECRET must be a non-placeholder value of at least 32 characters")
+            self.DEBUG = False
+            self.DOCS_ENABLED = False
+        return self
 
     @field_validator("ALLOWED_CORS_ORIGINS", mode="before")
     @classmethod

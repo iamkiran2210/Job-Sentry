@@ -9,7 +9,7 @@ from app.core.exceptions import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
-from app.core.observability import StructuredRequestLoggingMiddleware
+from app.core.observability import SecurityHeadersMiddleware, StructuredRequestLoggingMiddleware
 from app.modules.auth.router import router as auth_router
 from app.modules.companies.router import router as companies_router
 from app.modules.jobs.router import router as jobs_router
@@ -42,12 +42,13 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     description="Job Sentry Backend API - Foundation, Organizations & Recruitment Job Domain",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if settings.DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if settings.DOCS_ENABLED else None,
     lifespan=lifespan,
 )
 app.add_middleware(StructuredRequestLoggingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS Middleware
 origins = settings.ALLOWED_CORS_ORIGINS

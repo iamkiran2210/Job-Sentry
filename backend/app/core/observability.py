@@ -100,3 +100,33 @@ class StructuredRequestLoggingMiddleware:
                 except (ValueError, UnicodeDecodeError):
                     break
         return str(uuid4())
+
+
+class SecurityHeadersMiddleware:
+    """Add browser safety headers and prevent caching of JSON API responses."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_security_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                existing = {key.lower() for key, _ in headers}
+                additions = [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"x-frame-options", b"DENY"),
+                    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                ]
+                content_type = next((value for key, value in headers if key.lower() == b"content-type"), b"")
+                if content_type.startswith(b"application/json"):
+                    additions.append((b"cache-control", b"no-store"))
+                headers.extend((key, value) for key, value in additions if key not in existing)
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_with_security_headers)
