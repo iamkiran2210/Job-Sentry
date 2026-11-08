@@ -13,6 +13,11 @@ from app.modules.auth.router import router as auth_router
 from app.modules.companies.router import router as companies_router
 from app.modules.jobs.router import router as jobs_router
 from app.modules.users.router import router as users_router
+from app.modules.candidate_intelligence.api.router import router as candidate_intelligence_router
+from app.modules.application_status.router import router as application_status_router
+
+from app.ai_features import startup_check
+from app.ai_features.api import router as ai_features_router
 from app.utils.responses import success_response
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -23,6 +28,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan context for managing startup and shutdown."""
+
+    startup_check()
     # Startup: connection verification
     yield
     # Shutdown: clean up database connections
@@ -64,6 +71,9 @@ app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(users_router, prefix=settings.API_V1_PREFIX)
 app.include_router(companies_router, prefix=settings.API_V1_PREFIX)
 app.include_router(jobs_router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai_features_router, prefix=settings.API_V1_PREFIX)
+app.include_router(candidate_intelligence_router, prefix=settings.API_V1_PREFIX)
+app.include_router(application_status_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["Health"])

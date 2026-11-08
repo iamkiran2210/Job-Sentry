@@ -28,3 +28,9 @@ Validation: full suite — 362 passed, 2 skipped in 138.47s. An auth subset run 
 Synchronous embedding provider work in asynchronous scoring now runs in Starlette's thread pool; the provider Protocol remains synchronous for simple mocks and CPU-bound implementations.
 Regression: `tests/candidate_intelligence/test_nonblocking_embedding.py::test_sync_embedding_does_not_block_the_event_loop` passes after first failing against the blocking implementation.
 Validation: full suite — 363 passed, 2 skipped in 133.09s.
+
+## F3 application status workflow (2026-11-08)
+Added revision `c2f6b1a8d904` after `a91d6e4f2b70`, with reversible status normalization, an append-only status history table, and the user-facing status PATCH/history endpoints. Legacy mapping: `processing` stays processing, `analyzing` maps to processing, `completed`/`analyzed` map to analyzed, existing shortlisted/rejected/withdrawn values remain, and all other values map to applied; the backup table restores exact legacy strings on downgrade.
+Workers now record `applied → processing → analyzed`; terminal processing failures reset to applied. Rejection requires a reason; user/system actor rules and tenant/job authorization are enforced.
+Passing coverage: `tests/candidate_intelligence/test_application_status_workflow.py` (29 cases), `tests/candidate_intelligence/test_migration_roundtrip.py::test_postgres_migration_roundtrip_and_phase1_to_3_data_survival`, and resume worker API/pipeline tests.
+Validation: full suite — 391 passed, 2 skipped in 135.11s. Alembic fixture `check` reports no drift; round trip preserves schema and `vector`.

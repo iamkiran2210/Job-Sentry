@@ -8,7 +8,7 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import asyncpg
 import pytest
@@ -23,7 +23,7 @@ ROUNDTRIP_DATABASE = "job_sentry_roundtrip_test"
 BASELINE_REVISION = "b7d2e9a4c1f5"
 PHASE4_INITIAL_REVISION = "c4e91a72b603"
 PHASE4_PRE_TYPED_REVISION = "d6f3a810bc42"
-PHASE4_HEAD = "a91d6e4f2b70"
+PHASE4_HEAD = "c2f6b1a8d904"
 
 
 def _connection_args(url: URL, database: str | None = None) -> dict:
@@ -134,7 +134,7 @@ async def _seed_phase1_to_3_rows(conn: asyncpg.Connection) -> dict[str, str]:
     )
     await conn.execute(
         "INSERT INTO job_sentry.applications (id, company_id, job_id, candidate_id, status, created_at, updated_at) "
-        "VALUES ($1, $2, $3, $4, 'applied', $5, $5)",
+        "VALUES ($1, $2, $3, $4, 'completed', $5, $5)",
         application_id, company_id, job_id, candidate_id, now,
     )
     return {"company_id": str(company_id), "user_id": str(user_id), "job_id": str(job_id),
@@ -168,6 +168,15 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         _run_alembic(roundtrip_url, "upgrade", BASELINE_REVISION)
         roundtrip_conn = await asyncpg.connect(**_connection_args(base, ROUNDTRIP_DATABASE))
         legacy = await _seed_phase1_to_3_rows(roundtrip_conn)
+        unknown_application_id = uuid4()
+        await roundtrip_conn.execute(
+            "INSERT INTO job_sentry.applications "
+            "(id, company_id, job_id, candidate_id, status, created_at, updated_at) "
+            "VALUES ($1, $2, $3, NULL, 'unknown_legacy', $4, $4)",
+                unknown_application_id, UUID(legacy["company_id"]),
+                UUID(legacy["job_id"]), datetime.now(timezone.utc),
+        )
+        legacy["unknown_application_id"] = str(unknown_application_id)
         await roundtrip_conn.close()
         roundtrip_conn = None
 
@@ -210,6 +219,8 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.jobs WHERE id = $1", legacy["job_id"]) == 1
         assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.candidates WHERE id = $1", legacy["candidate_id"]) == 1
         assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == 1
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "analyzed"
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "applied"
         assert await roundtrip_conn.fetchval("SELECT job_id FROM job_sentry.candidate_scores WHERE id = $1", score_id) == __import__("uuid").UUID(legacy["job_id"])
         assert json.loads(await roundtrip_conn.fetchval(
             "SELECT mandatory_results FROM job_sentry.candidate_scores WHERE id = $1", score_id
@@ -225,6 +236,12 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         drift = _run_alembic(roundtrip_url, "check")
         assert "No new upgrade operations detected." in drift
         _run_alembic(roundtrip_url, "downgrade", PHASE4_PRE_TYPED_REVISION)
+        roundtrip_conn = await asyncpg.connect(**_connection_args(base, ROUNDTRIP_DATABASE))
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "completed"
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "unknown_legacy"
+        assert await roundtrip_conn.fetchval("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')") is True
+        await roundtrip_conn.close()
+        roundtrip_conn = None
         _run_alembic(roundtrip_url, "upgrade", "head")
 
         roundtrip_conn = await asyncpg.connect(**_connection_args(base, ROUNDTRIP_DATABASE))
@@ -232,6 +249,8 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         assert schema_after == schema_before
         assert schema_after["vector_extension"] is True
         assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == 1
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "analyzed"
+        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "applied"
     finally:
         if roundtrip_conn is not None and not roundtrip_conn.is_closed():
             await roundtrip_conn.close()
