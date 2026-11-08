@@ -15,6 +15,7 @@ from app.modules.jobs.router import router as jobs_router
 from app.modules.users.router import router as users_router
 from app.modules.candidate_intelligence.api.router import router as candidate_intelligence_router
 from app.modules.application_status.router import router as application_status_router
+from app.modules.analytics.router import router as analytics_router
 
 from app.ai_features import startup_check
 from app.ai_features.api import router as ai_features_router
@@ -74,6 +75,7 @@ app.include_router(jobs_router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_features_router, prefix=settings.API_V1_PREFIX)
 app.include_router(candidate_intelligence_router, prefix=settings.API_V1_PREFIX)
 app.include_router(application_status_router, prefix=settings.API_V1_PREFIX)
+app.include_router(analytics_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["Health"])
