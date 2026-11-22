@@ -1,0 +1,141 @@
+x-backend-env: &backend_env
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  DEBUG: ${DEBUG:-false}
+  AI_ENV: ${AI_ENV:-production}
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kiran}:${POSTGRES_PASSWORD:-Kiran123}@db:5432/${POSTGRES_DB:-kiran}
+  ALEMBIC_CONFIRM_DB: ${POSTGRES_DB:-kiran}
+  REDIS_URL: redis://redis:6379/0
+  RESUMES_CELERY_BROKER_URL: redis://redis:6379/0
+  RESUMES_STORAGE_BACKEND: local
+  RESUMES_LOCAL_STORAGE_DIR: /data/resumes
+  RESUMES_TESSERACT_CMD: /usr/bin/tesseract
+  ALLOWED_CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:8000
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: job_sentry_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kiran}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Kiran123}
+      POSTGRES_DB: ${POSTGRES_DB:-kiran}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kiran} -d ${POSTGRES_DB:-kiran}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: job_sentry_redis
+    restart: unless-stopped
+    command: [ "redis-server", "--appendonly", "yes" ]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: job-sentry-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: job_sentry_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend_env
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - resume_data:/data/resumes
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    image: job-sentry-backend:latest
+    container_name: job_sentry_celery_worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend_env
+    volumes:
+      - resume_data:/data/resumes
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: >
+      celery -A app.ai_features.resumes.celery_app:celery_app worker
+      -Q resumes,celery -l info --concurrency 4 --without-gossip --without-mingle
+
+  celery_beat:
+    image: job-sentry-backend:latest
+    container_name: job_sentry_celery_beat
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend_env
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A app.ai_features.resumes.celery_app:celery_app beat -l info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+        PUBLIC_GOOGLE_CLIENT_ID: ${PUBLIC_GOOGLE_CLIENT_ID:-398317719666-d2hbep1lfjrjeuh6kpuk079kqhddtc2e.apps.googleusercontent.com}
+        PUBLIC_SCORE_SCALE: ${PUBLIC_SCORE_SCALE:-100}
+    container_name: job_sentry_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: job_sentry_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://frontend:80
+    depends_on:
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  resume_data:

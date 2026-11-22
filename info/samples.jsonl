@@ -1,0 +1,1733 @@
+{
+  "text": "Priya Wei\npriya.wei0@example.com | +1 415 555 7468 | Springfield\nSUMMARY\nEngineer with 8+ years of FastAPI experience.\nSKILLS\nFastAPI, Linux, Redis\nEXPERIENCE\nML Engineer at Acme Robotics (2017 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Example University, 2014\nCERTIFICATIONS\nAWS Certified Developer\nPROJECTS\nInventory Tracker - FastAPI service for internal use",
+  "gold": {
+    "full_name": "Priya Wei",
+    "email": "priya.wei0@example.com",
+    "phone": "+1 415 555 7468",
+    "skills": [
+      "FastAPI",
+      "Linux",
+      "Redis"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "AWS Certified Developer"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Noah Smith\nnoah.smith1@example.com | +1 415 555 2013 | Hillcrest\nSUMMARY\nEngineer with 5+ years of Celery experience.\nSKILLS\nCelery, TypeScript, Python, Docker, Go, Redis, PostgreSQL\nEXPERIENCE\nData Engineer, Northwind Labs, 2018-03 to 2021-06\nDelivered production services and mentored teammates.\nDevOps Engineer, Globex Systems, 2020-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2016\nCERTIFICATIONS\nAWS Certified Developer\nGoogle Professional Data Engineer\nPROJECTS\nResume Parser - PostgreSQL service for internal use",
+  "gold": {
+    "full_name": "Noah Smith",
+    "email": "noah.smith1@example.com",
+    "phone": "+1 415 555 2013",
+    "skills": [
+      "Celery",
+      "TypeScript",
+      "Python",
+      "Docker",
+      "Go",
+      "Redis",
+      "PostgreSQL"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "AWS Certified Developer",
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Priya Rossi\npriya.rossi2@example.com | +1 415 555 8424 | Springfield\nSUMMARY\nEngineer with 8+ years of Kubernetes experience.\nSKILLS\nKubernetes, Docker, Go, PostgreSQL, Linux\nEXPERIENCE\nPlatform Engineer at Wayne Logistics (2021 - 2023)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2009\nCERTIFICATIONS\nHashiCorp Terraform Associate\nAWS Certified Developer\nPROJECTS\nLog Insight - Linux service for internal use\nChat Relay - Linux service for internal use",
+  "gold": {
+    "full_name": "Priya Rossi",
+    "email": "priya.rossi2@example.com",
+    "phone": "+1 415 555 8424",
+    "skills": [
+      "Kubernetes",
+      "Docker",
+      "Go",
+      "PostgreSQL",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "AWS Certified Developer"
+    ],
+    "projects": [
+      "Log Insight",
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Priya Nair\npriya.nair3@example.com | +1 415 555 6737 | Rivertown\nSUMMARY\nEngineer with 3+ years of Svelte experience.\nSKILLS\nSvelte, Celery, Go, Git, FastAPI, Terraform, Kubernetes\nEXPERIENCE\nBackend Engineer, Acme Robotics, 2022-03 to 2025-06\nDelivered production services and mentored teammates.\nML Engineer, Wayne Logistics, 2022-03 to 2024-06\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Northern Institute of Technology, 2008\nCERTIFICATIONS\nGoogle Professional Data Engineer\nPROJECTS\nResume Parser - Kubernetes service for internal use",
+  "gold": {
+    "full_name": "Priya Nair",
+    "email": "priya.nair3@example.com",
+    "phone": "+1 415 555 6737",
+    "skills": [
+      "Svelte",
+      "Celery",
+      "Go",
+      "Git",
+      "FastAPI",
+      "Terraform",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Wayne Logistics",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Lucas Wei\nlucas.wei4@example.com | +1 415 555 5056 | Rivertown\nSUMMARY\nEngineer with 9+ years of TypeScript experience.\nSKILLS\nTypeScript, Linux, Svelte, FastAPI, PostgreSQL, Go\nEXPERIENCE\nPlatform Engineer, Globex Systems, 2020-03 to 2022-06\nDelivered production services and mentored teammates.\nPlatform Engineer, Stark Data, 2018-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Riverside College, 2010\nPROJECTS\nInventory Tracker - Svelte service for internal use",
+  "gold": {
+    "full_name": "Lucas Wei",
+    "email": "lucas.wei4@example.com",
+    "phone": "+1 415 555 5056",
+    "skills": [
+      "TypeScript",
+      "Linux",
+      "Svelte",
+      "FastAPI",
+      "PostgreSQL",
+      "Go"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Stark Data",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Lucas Rao\nlucas.rao5@example.com | +1 415 555 3386 | Rivertown\nSUMMARY\nEngineer with 3+ years of Redis experience.\nSKILLS\nRedis, Rust, Celery, Go, Linux, PostgreSQL\nEXPERIENCE\nML Engineer at Acme Robotics (2020 - 2022)\nDelivered production services and mentored teammates.\nSoftware Developer at Stark Data (2018 - 2019)\nDelivered production services and mentored teammates.\nSoftware Developer at Acme Robotics (2022 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2010\nPROJECTS\nResume Parser - Linux service for internal use\nInventory Tracker - Redis service for internal use",
+  "gold": {
+    "full_name": "Lucas Rao",
+    "email": "lucas.rao5@example.com",
+    "phone": "+1 415 555 3386",
+    "skills": [
+      "Redis",
+      "Rust",
+      "Celery",
+      "Go",
+      "Linux",
+      "PostgreSQL"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Stark Data",
+        "title": "Software Developer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Resume Parser",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Priya Petrov\npriya.petrov6@example.com | +1 415 555 1417 | Hillcrest\nSUMMARY\nEngineer with 7+ years of Linux experience.\nSKILLS\nLinux, Docker, Celery\nEXPERIENCE\nDevOps Engineer, Umbrella Analytics, 2014-03 to 2016-06\nDelivered production services and mentored teammates.\nBackend Engineer, Northwind Labs, 2019-03 to 2021-06\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Lakeview University, 2012\nPROJECTS\nInventory Tracker - Celery service for internal use",
+  "gold": {
+    "full_name": "Priya Petrov",
+    "email": "priya.petrov6@example.com",
+    "phone": "+1 415 555 1417",
+    "skills": [
+      "Linux",
+      "Docker",
+      "Celery"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Chen Tanaka\nchen.tanaka7@example.com | +1 415 555 1378 | Springfield\nSUMMARY\nEngineer with 9+ years of Redis experience.\nSKILLS\nRedis, Rust, PostgreSQL, SQL\nEXPERIENCE\nML Engineer at Umbrella Analytics (2012 - Present)\nDelivered production services and mentored teammates.\nML Engineer at Hooli Cloud (2016 - 2017)\nDelivered production services and mentored teammates.\nML Engineer at Hooli Cloud (2015 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Riverside College, 2020\nPROJECTS\nLog Insight - Redis service for internal use\nResume Parser - PostgreSQL service for internal use",
+  "gold": {
+    "full_name": "Chen Tanaka",
+    "email": "chen.tanaka7@example.com",
+    "phone": "+1 415 555 1378",
+    "skills": [
+      "Redis",
+      "Rust",
+      "PostgreSQL",
+      "SQL"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Log Insight",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Sofia Silva\nsofia.silva8@example.com | +1 415 555 4172 | Rivertown\nSUMMARY\nEngineer with 8+ years of Rust experience.\nSKILLS\nRust, Svelte, Go, SQL, Git, Terraform, FastAPI\nEXPERIENCE\nData Engineer, Wayne Logistics, 2013-03 to 2014-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2017\nCERTIFICATIONS\nAWS Certified Developer\nCertified Kubernetes Administrator\nPROJECTS\nInventory Tracker - SQL service for internal use\nResume Parser - Svelte service for internal use",
+  "gold": {
+    "full_name": "Sofia Silva",
+    "email": "sofia.silva8@example.com",
+    "phone": "+1 415 555 4172",
+    "skills": [
+      "Rust",
+      "Svelte",
+      "Go",
+      "SQL",
+      "Git",
+      "Terraform",
+      "FastAPI"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "AWS Certified Developer",
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Inventory Tracker",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Omar Smith\nomar.smith9@example.com | +1 415 555 6447 | Springfield\nSUMMARY\nEngineer with 2+ years of Go experience.\nSKILLS\nGo, SQL, TypeScript\nEXPERIENCE\nDevOps Engineer at Northwind Labs (2018 - Present)\nDelivered production services and mentored teammates.\nData Engineer at Acme Robotics (2014 - 2015)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Riverside College, 2017\nCERTIFICATIONS\nHashiCorp Terraform Associate\nGoogle Professional Data Engineer\nPROJECTS\nLog Insight - TypeScript service for internal use\nResume Parser - TypeScript service for internal use",
+  "gold": {
+    "full_name": "Omar Smith",
+    "email": "omar.smith9@example.com",
+    "phone": "+1 415 555 6447",
+    "skills": [
+      "Go",
+      "SQL",
+      "TypeScript"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Log Insight",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Chen Haddad\nchen.haddad10@example.com | +1 415 555 4191 | Springfield\nSUMMARY\nEngineer with 4+ years of Python experience.\nSKILLS\nPython, Kubernetes, Docker, Linux\nEXPERIENCE\nML Engineer, Hooli Cloud, 2015-03 to 2017-06\nDelivered production services and mentored teammates.\nBackend Engineer, Hooli Cloud, 2014-03 to 2016-06\nDelivered production services and mentored teammates.\nData Engineer, Globex Systems, 2020-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Riverside College, 2017\nPROJECTS\nLog Insight - Python service for internal use",
+  "gold": {
+    "full_name": "Chen Haddad",
+    "email": "chen.haddad10@example.com",
+    "phone": "+1 415 555 4191",
+    "skills": [
+      "Python",
+      "Kubernetes",
+      "Docker",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Priya Smith\npriya.smith11@example.com | +1 415 555 9492 | Hillcrest\nSUMMARY\nEngineer with 6+ years of Redis experience.\nSKILLS\nRedis, Svelte, Go, FastAPI, Git, Python, Docker\nEXPERIENCE\nBackend Engineer, Northwind Labs, 2016-03 to 2019-06\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Example University, 2020\nPROJECTS\nRoute Planner - Git service for internal use\nLog Insight - Svelte service for internal use",
+  "gold": {
+    "full_name": "Priya Smith",
+    "email": "priya.smith11@example.com",
+    "phone": "+1 415 555 9492",
+    "skills": [
+      "Redis",
+      "Svelte",
+      "Go",
+      "FastAPI",
+      "Git",
+      "Python",
+      "Docker"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Route Planner",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Amara Tanaka\namara.tanaka12@example.com | +1 415 555 5253 | Rivertown\nSUMMARY\nEngineer with 8+ years of Git experience.\nSKILLS\nGit, Docker, Svelte, PostgreSQL, TypeScript, FastAPI, Terraform\nEXPERIENCE\nBackend Engineer, Initech Software, 2017-03 to Present\nDelivered production services and mentored teammates.\nDevOps Engineer, Umbrella Analytics, 2015-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Northern Institute of Technology, 2010\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nLog Insight - FastAPI service for internal use\nInventory Tracker - Terraform service for internal use",
+  "gold": {
+    "full_name": "Amara Tanaka",
+    "email": "amara.tanaka12@example.com",
+    "phone": "+1 415 555 5253",
+    "skills": [
+      "Git",
+      "Docker",
+      "Svelte",
+      "PostgreSQL",
+      "TypeScript",
+      "FastAPI",
+      "Terraform"
+    ],
+    "employment": [
+      {
+        "company": "Initech Software",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Log Insight",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Fatima Wei\nfatima.wei13@example.com | +1 415 555 8070 | Rivertown\nSUMMARY\nEngineer with 4+ years of TypeScript experience.\nSKILLS\nTypeScript, Rust, Git, Docker, Linux, Terraform, FastAPI\nEXPERIENCE\nBackend Engineer at Hooli Cloud (2017 - 2020)\nDelivered production services and mentored teammates.\nDevOps Engineer at Acme Robotics (2019 - 2021)\nDelivered production services and mentored teammates.\nML Engineer at Umbrella Analytics (2020 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Riverside College, 2009\nPROJECTS\nRoute Planner - FastAPI service for internal use\nInventory Tracker - Docker service for internal use",
+  "gold": {
+    "full_name": "Fatima Wei",
+    "email": "fatima.wei13@example.com",
+    "phone": "+1 415 555 8070",
+    "skills": [
+      "TypeScript",
+      "Rust",
+      "Git",
+      "Docker",
+      "Linux",
+      "Terraform",
+      "FastAPI"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Route Planner",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Noah Silva\nnoah.silva14@example.com | +1 415 555 7651 | Rivertown\nSUMMARY\nEngineer with 2+ years of Redis experience.\nSKILLS\nRedis, Git, Celery, Svelte\nEXPERIENCE\nBackend Engineer, Umbrella Analytics, 2017-03 to Present\nDelivered production services and mentored teammates.\nBackend Engineer, Umbrella Analytics, 2018-03 to Present\nDelivered production services and mentored teammates.\nBackend Engineer, Initech Software, 2016-03 to 2017-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2008\nCERTIFICATIONS\nHashiCorp Terraform Associate\nPROJECTS\nResume Parser - Redis service for internal use\nLog Insight - Git service for internal use",
+  "gold": {
+    "full_name": "Noah Silva",
+    "email": "noah.silva14@example.com",
+    "phone": "+1 415 555 7651",
+    "skills": [
+      "Redis",
+      "Git",
+      "Celery",
+      "Svelte"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Resume Parser",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Lucas Rao\nlucas.rao15@example.com | +1 415 555 3967 | Rivertown\nSUMMARY\nEngineer with 6+ years of Git experience.\nSKILLS\nGit, Kubernetes, Terraform, Linux\nEXPERIENCE\nPlatform Engineer, Wayne Logistics, 2015-03 to Present\nDelivered production services and mentored teammates.\nPlatform Engineer, Acme Robotics, 2016-03 to Present\nDelivered production services and mentored teammates.\nBackend Engineer, Initech Software, 2012-03 to 2015-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2009\nCERTIFICATIONS\nHashiCorp Terraform Associate\nGoogle Professional Data Engineer\nPROJECTS\nResume Parser - Terraform service for internal use\nChat Relay - Kubernetes service for internal use",
+  "gold": {
+    "full_name": "Lucas Rao",
+    "email": "lucas.rao15@example.com",
+    "phone": "+1 415 555 3967",
+    "skills": [
+      "Git",
+      "Kubernetes",
+      "Terraform",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Resume Parser",
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Amara Okafor\namara.okafor16@example.com | +1 415 555 3289 | Lakeside\nSUMMARY\nEngineer with 9+ years of Rust experience.\nSKILLS\nRust, Python, PostgreSQL, Linux, FastAPI, Kubernetes\nEXPERIENCE\nBackend Engineer at Northwind Labs (2014 - 2017)\nDelivered production services and mentored teammates.\nDevOps Engineer at Umbrella Analytics (2020 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Northern Institute of Technology, 2008\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nRoute Planner - PostgreSQL service for internal use",
+  "gold": {
+    "full_name": "Amara Okafor",
+    "email": "amara.okafor16@example.com",
+    "phone": "+1 415 555 3289",
+    "skills": [
+      "Rust",
+      "Python",
+      "PostgreSQL",
+      "Linux",
+      "FastAPI",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Kenji Nair\nkenji.nair17@example.com | +1 415 555 5005 | Lakeside\nSUMMARY\nEngineer with 8+ years of Git experience.\nSKILLS\nGit, Kubernetes, Docker\nEXPERIENCE\nBackend Engineer at Hooli Cloud (2014 - Present)\nDelivered production services and mentored teammates.\nPlatform Engineer at Initech Software (2019 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Northern Institute of Technology, 2009\nPROJECTS\nResume Parser - Docker service for internal use\nInventory Tracker - Git service for internal use",
+  "gold": {
+    "full_name": "Kenji Nair",
+    "email": "kenji.nair17@example.com",
+    "phone": "+1 415 555 5005",
+    "skills": [
+      "Git",
+      "Kubernetes",
+      "Docker"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [],
+    "projects": [
+      "Resume Parser",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Maria Petrov\nmaria.petrov18@example.com | +1 415 555 9670 | Lakeside\nSUMMARY\nEngineer with 2+ years of Terraform experience.\nSKILLS\nTerraform, SQL, Go, Celery\nEXPERIENCE\nDevOps Engineer at Wayne Logistics (2017 - 2018)\nDelivered production services and mentored teammates.\nDevOps Engineer at Globex Systems (2021 - 2022)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Riverside College, 2016\nCERTIFICATIONS\nAWS Certified Developer\nGoogle Professional Data Engineer\nPROJECTS\nInventory Tracker - Terraform service for internal use",
+  "gold": {
+    "full_name": "Maria Petrov",
+    "email": "maria.petrov18@example.com",
+    "phone": "+1 415 555 9670",
+    "skills": [
+      "Terraform",
+      "SQL",
+      "Go",
+      "Celery"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [
+      "AWS Certified Developer",
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Omar Rossi\nomar.rossi19@example.com | +1 415 555 1831 | Rivertown\nSUMMARY\nEngineer with 6+ years of Terraform experience.\nSKILLS\nTerraform, Redis, Git\nEXPERIENCE\nPlatform Engineer at Acme Robotics (2019 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Example University, 2018\nCERTIFICATIONS\nAWS Certified Developer\nGoogle Professional Data Engineer\nPROJECTS\nRoute Planner - Terraform service for internal use\nInventory Tracker - Git service for internal use",
+  "gold": {
+    "full_name": "Omar Rossi",
+    "email": "omar.rossi19@example.com",
+    "phone": "+1 415 555 1831",
+    "skills": [
+      "Terraform",
+      "Redis",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "AWS Certified Developer",
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Route Planner",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Noah Rossi\nnoah.rossi20@example.com | +1 415 555 9092 | Springfield\nSUMMARY\nEngineer with 9+ years of FastAPI experience.\nSKILLS\nFastAPI, Svelte, Terraform, Kubernetes, Python, Celery\nEXPERIENCE\nData Engineer, Northwind Labs, 2022-03 to Present\nDelivered production services and mentored teammates.\nPlatform Engineer, Umbrella Analytics, 2017-03 to Present\nDelivered production services and mentored teammates.\nSoftware Developer, Acme Robotics, 2012-03 to 2014-06\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Example University, 2019\nPROJECTS\nRoute Planner - Python service for internal use\nResume Parser - Svelte service for internal use",
+  "gold": {
+    "full_name": "Noah Rossi",
+    "email": "noah.rossi20@example.com",
+    "phone": "+1 415 555 9092",
+    "skills": [
+      "FastAPI",
+      "Svelte",
+      "Terraform",
+      "Kubernetes",
+      "Python",
+      "Celery"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Route Planner",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Lucas Garcia\nlucas.garcia21@example.com | +1 415 555 8748 | Hillcrest\nSUMMARY\nEngineer with 9+ years of Kubernetes experience.\nSKILLS\nKubernetes, Svelte, FastAPI\nEXPERIENCE\nPlatform Engineer, Stark Data, 2019-03 to Present\nDelivered production services and mentored teammates.\nML Engineer, Northwind Labs, 2013-03 to 2014-06\nDelivered production services and mentored teammates.\nData Engineer, Umbrella Analytics, 2017-03 to 2018-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2015\nCERTIFICATIONS\nAWS Certified Developer\nPROJECTS\nInventory Tracker - Svelte service for internal use",
+  "gold": {
+    "full_name": "Lucas Garcia",
+    "email": "lucas.garcia21@example.com",
+    "phone": "+1 415 555 8748",
+    "skills": [
+      "Kubernetes",
+      "Svelte",
+      "FastAPI"
+    ],
+    "employment": [
+      {
+        "company": "Stark Data",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Umbrella Analytics",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "AWS Certified Developer"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Amara Wei\namara.wei22@example.com | +1 415 555 7818 | Lakeside\nSUMMARY\nEngineer with 3+ years of TypeScript experience.\nSKILLS\nTypeScript, Rust, FastAPI, Linux, Python\nEXPERIENCE\nSoftware Developer at Northwind Labs (2017 - Present)\nDelivered production services and mentored teammates.\nPlatform Engineer at Hooli Cloud (2016 - 2017)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2013\nCERTIFICATIONS\nGoogle Professional Data Engineer\nPROJECTS\nRoute Planner - Rust service for internal use",
+  "gold": {
+    "full_name": "Amara Wei",
+    "email": "amara.wei22@example.com",
+    "phone": "+1 415 555 7818",
+    "skills": [
+      "TypeScript",
+      "Rust",
+      "FastAPI",
+      "Linux",
+      "Python"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Software Developer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Fatima Silva\nfatima.silva23@example.com | +1 415 555 8147 | Hillcrest\nSUMMARY\nEngineer with 6+ years of Rust experience.\nSKILLS\nRust, Docker, Go, Git, TypeScript, Python, Terraform\nEXPERIENCE\nData Engineer, Northwind Labs, 2020-03 to 2021-06\nDelivered production services and mentored teammates.\nML Engineer, Globex Systems, 2019-03 to 2022-06\nDelivered production services and mentored teammates.\nBackend Engineer, Globex Systems, 2019-03 to 2020-06\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Northern Institute of Technology, 2012\nCERTIFICATIONS\nGoogle Professional Data Engineer\nPROJECTS\nChat Relay - Rust service for internal use\nLog Insight - Docker service for internal use",
+  "gold": {
+    "full_name": "Fatima Silva",
+    "email": "fatima.silva23@example.com",
+    "phone": "+1 415 555 8147",
+    "skills": [
+      "Rust",
+      "Docker",
+      "Go",
+      "Git",
+      "TypeScript",
+      "Python",
+      "Terraform"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Chat Relay",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Noah Wei\nnoah.wei24@example.com | +1 415 555 2231 | Lakeside\nSUMMARY\nEngineer with 3+ years of Redis experience.\nSKILLS\nRedis, Go, Svelte, Git\nEXPERIENCE\nPlatform Engineer at Wayne Logistics (2019 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Riverside College, 2011\nPROJECTS\nRoute Planner - Svelte service for internal use",
+  "gold": {
+    "full_name": "Noah Wei",
+    "email": "noah.wei24@example.com",
+    "phone": "+1 415 555 2231",
+    "skills": [
+      "Redis",
+      "Go",
+      "Svelte",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Elena Khan\nelena.khan25@example.com | +1 415 555 1329 | Hillcrest\nSUMMARY\nEngineer with 2+ years of TypeScript experience.\nSKILLS\nTypeScript, Git, SQL, Redis, Docker, Linux\nEXPERIENCE\nBackend Engineer, Wayne Logistics, 2017-03 to 2019-06\nDelivered production services and mentored teammates.\nDevOps Engineer, Initech Software, 2014-03 to 2015-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2014\nCERTIFICATIONS\nHashiCorp Terraform Associate\nCertified Kubernetes Administrator\nPROJECTS\nInventory Tracker - Docker service for internal use\nLog Insight - Redis service for internal use",
+  "gold": {
+    "full_name": "Elena Khan",
+    "email": "elena.khan25@example.com",
+    "phone": "+1 415 555 1329",
+    "skills": [
+      "TypeScript",
+      "Git",
+      "SQL",
+      "Redis",
+      "Docker",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Inventory Tracker",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Aarav Garcia\naarav.garcia26@example.com | +1 415 555 7414 | Lakeside\nSUMMARY\nEngineer with 2+ years of Linux experience.\nSKILLS\nLinux, Svelte, Git, Docker, FastAPI, SQL, PostgreSQL\nEXPERIENCE\nDevOps Engineer, Northwind Labs, 2020-03 to 2023-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Example University, 2008\nPROJECTS\nResume Parser - Svelte service for internal use",
+  "gold": {
+    "full_name": "Aarav Garcia",
+    "email": "aarav.garcia26@example.com",
+    "phone": "+1 415 555 7414",
+    "skills": [
+      "Linux",
+      "Svelte",
+      "Git",
+      "Docker",
+      "FastAPI",
+      "SQL",
+      "PostgreSQL"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Noah Silva\nnoah.silva27@example.com | +1 415 555 9654 | Rivertown\nSUMMARY\nEngineer with 6+ years of SQL experience.\nSKILLS\nSQL, Go, FastAPI, Linux, Git, Kubernetes\nEXPERIENCE\nData Engineer at Stark Data (2021 - Present)\nDelivered production services and mentored teammates.\nBackend Engineer at Acme Robotics (2021 - 2024)\nDelivered production services and mentored teammates.\nPlatform Engineer at Hooli Cloud (2019 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Riverside College, 2016\nPROJECTS\nChat Relay - Linux service for internal use",
+  "gold": {
+    "full_name": "Noah Silva",
+    "email": "noah.silva27@example.com",
+    "phone": "+1 415 555 9654",
+    "skills": [
+      "SQL",
+      "Go",
+      "FastAPI",
+      "Linux",
+      "Git",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Stark Data",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Noah Smith\nnoah.smith28@example.com | +1 415 555 7881 | Lakeside\nSUMMARY\nEngineer with 9+ years of Kubernetes experience.\nSKILLS\nKubernetes, Docker, Terraform\nEXPERIENCE\nData Engineer at Wayne Logistics (2017 - 2018)\nDelivered production services and mentored teammates.\nPlatform Engineer at Stark Data (2018 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2011\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nLog Insight - Kubernetes service for internal use\nResume Parser - Terraform service for internal use",
+  "gold": {
+    "full_name": "Noah Smith",
+    "email": "noah.smith28@example.com",
+    "phone": "+1 415 555 7881",
+    "skills": [
+      "Kubernetes",
+      "Docker",
+      "Terraform"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Stark Data",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Log Insight",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Sofia Petrov\nsofia.petrov29@example.com | +1 415 555 4068 | Hillcrest\nSUMMARY\nEngineer with 9+ years of Svelte experience.\nSKILLS\nSvelte, TypeScript, Terraform, Python\nEXPERIENCE\nSoftware Developer at Acme Robotics (2014 - Present)\nDelivered production services and mentored teammates.\nData Engineer at Stark Data (2021 - Present)\nDelivered production services and mentored teammates.\nSoftware Developer at Wayne Logistics (2014 - 2017)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Example University, 2009\nPROJECTS\nLog Insight - Terraform service for internal use\nResume Parser - Terraform service for internal use",
+  "gold": {
+    "full_name": "Sofia Petrov",
+    "email": "sofia.petrov29@example.com",
+    "phone": "+1 415 555 4068",
+    "skills": [
+      "Svelte",
+      "TypeScript",
+      "Terraform",
+      "Python"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "Software Developer"
+      },
+      {
+        "company": "Stark Data",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Wayne Logistics",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Log Insight",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Sofia Wei\nsofia.wei30@example.com | +1 415 555 2785 | Rivertown\nSUMMARY\nEngineer with 2+ years of FastAPI experience.\nSKILLS\nFastAPI, Kubernetes, Git\nEXPERIENCE\nBackend Engineer, Initech Software, 2018-03 to 2020-06\nDelivered production services and mentored teammates.\nSoftware Developer, Northwind Labs, 2016-03 to 2017-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Northern Institute of Technology, 2016\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nRoute Planner - Git service for internal use\nChat Relay - Kubernetes service for internal use",
+  "gold": {
+    "full_name": "Sofia Wei",
+    "email": "sofia.wei30@example.com",
+    "phone": "+1 415 555 2785",
+    "skills": [
+      "FastAPI",
+      "Kubernetes",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Initech Software",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Route Planner",
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Aarav Haddad\naarav.haddad31@example.com | +1 415 555 1571 | Rivertown\nSUMMARY\nEngineer with 4+ years of FastAPI experience.\nSKILLS\nFastAPI, Go, Python, Kubernetes, Docker, Git\nEXPERIENCE\nPlatform Engineer, Umbrella Analytics, 2017-03 to Present\nDelivered production services and mentored teammates.\nDevOps Engineer, Hooli Cloud, 2016-03 to 2018-06\nDelivered production services and mentored teammates.\nDevOps Engineer, Northwind Labs, 2012-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2019\nCERTIFICATIONS\nHashiCorp Terraform Associate\nPROJECTS\nChat Relay - FastAPI service for internal use\nResume Parser - Git service for internal use",
+  "gold": {
+    "full_name": "Aarav Haddad",
+    "email": "aarav.haddad31@example.com",
+    "phone": "+1 415 555 1571",
+    "skills": [
+      "FastAPI",
+      "Go",
+      "Python",
+      "Kubernetes",
+      "Docker",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Hooli Cloud",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Chat Relay",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Lucas Okafor\nlucas.okafor32@example.com | +1 415 555 3479 | Hillcrest\nSUMMARY\nEngineer with 4+ years of Docker experience.\nSKILLS\nDocker, Rust, Linux, Svelte, Go, Celery, FastAPI\nEXPERIENCE\nSoftware Developer at Globex Systems (2015 - 2016)\nDelivered production services and mentored teammates.\nDevOps Engineer at Acme Robotics (2013 - 2015)\nDelivered production services and mentored teammates.\nSoftware Developer at Northwind Labs (2014 - 2015)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Example University, 2011\nPROJECTS\nChat Relay - Svelte service for internal use\nResume Parser - Go service for internal use",
+  "gold": {
+    "full_name": "Lucas Okafor",
+    "email": "lucas.okafor32@example.com",
+    "phone": "+1 415 555 3479",
+    "skills": [
+      "Docker",
+      "Rust",
+      "Linux",
+      "Svelte",
+      "Go",
+      "Celery",
+      "FastAPI"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Software Developer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Chat Relay",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Noah Khan\nnoah.khan33@example.com | +1 415 555 9823 | Rivertown\nSUMMARY\nEngineer with 6+ years of Go experience.\nSKILLS\nGo, Linux, Kubernetes\nEXPERIENCE\nML Engineer, Umbrella Analytics, 2016-03 to 2018-06\nDelivered production services and mentored teammates.\nData Engineer, Wayne Logistics, 2016-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Riverside College, 2010\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nInventory Tracker - Kubernetes service for internal use\nChat Relay - Go service for internal use",
+  "gold": {
+    "full_name": "Noah Khan",
+    "email": "noah.khan33@example.com",
+    "phone": "+1 415 555 9823",
+    "skills": [
+      "Go",
+      "Linux",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Wayne Logistics",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Inventory Tracker",
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Noah Rossi\nnoah.rossi34@example.com | +1 415 555 1606 | Lakeside\nSUMMARY\nEngineer with 7+ years of Python experience.\nSKILLS\nPython, Svelte, Docker\nEXPERIENCE\nBackend Engineer at Umbrella Analytics (2017 - Present)\nDelivered production services and mentored teammates.\nData Engineer at Initech Software (2012 - 2013)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Riverside College, 2015\nCERTIFICATIONS\nGoogle Professional Data Engineer\nHashiCorp Terraform Associate\nPROJECTS\nInventory Tracker - Svelte service for internal use",
+  "gold": {
+    "full_name": "Noah Rossi",
+    "email": "noah.rossi34@example.com",
+    "phone": "+1 415 555 1606",
+    "skills": [
+      "Python",
+      "Svelte",
+      "Docker"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer",
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Chen Rao\nchen.rao35@example.com | +1 415 555 4341 | Rivertown\nSUMMARY\nEngineer with 3+ years of Python experience.\nSKILLS\nPython, Celery, SQL, Terraform, Docker\nEXPERIENCE\nSoftware Developer, Hooli Cloud, 2017-03 to 2018-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Riverside College, 2008\nCERTIFICATIONS\nHashiCorp Terraform Associate\nPROJECTS\nChat Relay - Docker service for internal use",
+  "gold": {
+    "full_name": "Chen Rao",
+    "email": "chen.rao35@example.com",
+    "phone": "+1 415 555 4341",
+    "skills": [
+      "Python",
+      "Celery",
+      "SQL",
+      "Terraform",
+      "Docker"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Maria Smith\nmaria.smith36@example.com | +1 415 555 3681 | Lakeside\nSUMMARY\nEngineer with 8+ years of SQL experience.\nSKILLS\nSQL, Kubernetes, TypeScript, Linux, Terraform, Git\nEXPERIENCE\nPlatform Engineer, Hooli Cloud, 2012-03 to 2014-06\nDelivered production services and mentored teammates.\nPlatform Engineer, Initech Software, 2012-03 to 2014-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Example University, 2014\nPROJECTS\nInventory Tracker - Linux service for internal use\nResume Parser - Kubernetes service for internal use",
+  "gold": {
+    "full_name": "Maria Smith",
+    "email": "maria.smith36@example.com",
+    "phone": "+1 415 555 3681",
+    "skills": [
+      "SQL",
+      "Kubernetes",
+      "TypeScript",
+      "Linux",
+      "Terraform",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Inventory Tracker",
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Chen Rao\nchen.rao37@example.com | +1 415 555 1846 | Rivertown\nSUMMARY\nEngineer with 5+ years of PostgreSQL experience.\nSKILLS\nPostgreSQL, Terraform, Go, TypeScript, FastAPI, Celery, Rust\nEXPERIENCE\nData Engineer, Globex Systems, 2020-03 to 2022-06\nDelivered production services and mentored teammates.\nML Engineer, Globex Systems, 2014-03 to Present\nDelivered production services and mentored teammates.\nSoftware Developer, Initech Software, 2018-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2013\nPROJECTS\nInventory Tracker - Rust service for internal use\nLog Insight - TypeScript service for internal use",
+  "gold": {
+    "full_name": "Chen Rao",
+    "email": "chen.rao37@example.com",
+    "phone": "+1 415 555 1846",
+    "skills": [
+      "PostgreSQL",
+      "Terraform",
+      "Go",
+      "TypeScript",
+      "FastAPI",
+      "Celery",
+      "Rust"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Data Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Inventory Tracker",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Chen Petrov\nchen.petrov38@example.com | +1 415 555 4573 | Lakeside\nSUMMARY\nEngineer with 8+ years of TypeScript experience.\nSKILLS\nTypeScript, Redis, PostgreSQL\nEXPERIENCE\nBackend Engineer at Globex Systems (2017 - Present)\nDelivered production services and mentored teammates.\nML Engineer at Acme Robotics (2012 - 2015)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2017\nCERTIFICATIONS\nGoogle Professional Data Engineer\nPROJECTS\nRoute Planner - Redis service for internal use\nLog Insight - PostgreSQL service for internal use",
+  "gold": {
+    "full_name": "Chen Petrov",
+    "email": "chen.petrov38@example.com",
+    "phone": "+1 415 555 4573",
+    "skills": [
+      "TypeScript",
+      "Redis",
+      "PostgreSQL"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer"
+    ],
+    "projects": [
+      "Route Planner",
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Sofia Wei\nsofia.wei39@example.com | +1 415 555 1382 | Springfield\nSUMMARY\nEngineer with 3+ years of Celery experience.\nSKILLS\nCelery, Svelte, Linux\nEXPERIENCE\nML Engineer, Wayne Logistics, 2019-03 to 2020-06\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2009\nPROJECTS\nChat Relay - Celery service for internal use\nRoute Planner - Linux service for internal use",
+  "gold": {
+    "full_name": "Sofia Wei",
+    "email": "sofia.wei39@example.com",
+    "phone": "+1 415 555 1382",
+    "skills": [
+      "Celery",
+      "Svelte",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Wayne Logistics",
+        "title": "ML Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [],
+    "projects": [
+      "Chat Relay",
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Chen Garcia\nchen.garcia40@example.com | +1 415 555 6140 | Lakeside\nSUMMARY\nEngineer with 7+ years of FastAPI experience.\nSKILLS\nFastAPI, Python, Go, Redis, TypeScript, PostgreSQL, Linux\nEXPERIENCE\nDevOps Engineer, Northwind Labs, 2021-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Northern Institute of Technology, 2020\nPROJECTS\nInventory Tracker - Python service for internal use",
+  "gold": {
+    "full_name": "Chen Garcia",
+    "email": "chen.garcia40@example.com",
+    "phone": "+1 415 555 6140",
+    "skills": [
+      "FastAPI",
+      "Python",
+      "Go",
+      "Redis",
+      "TypeScript",
+      "PostgreSQL",
+      "Linux"
+    ],
+    "employment": [
+      {
+        "company": "Northwind Labs",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Priya Petrov\npriya.petrov41@example.com | +1 415 555 5505 | Springfield\nSUMMARY\nEngineer with 3+ years of PostgreSQL experience.\nSKILLS\nPostgreSQL, Kubernetes, Redis, Svelte, Docker, Celery\nEXPERIENCE\nML Engineer, Initech Software, 2021-03 to 2023-06\nDelivered production services and mentored teammates.\nData Engineer, Globex Systems, 2012-03 to Present\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Northern Institute of Technology, 2018\nCERTIFICATIONS\nHashiCorp Terraform Associate\nPROJECTS\nRoute Planner - Celery service for internal use",
+  "gold": {
+    "full_name": "Priya Petrov",
+    "email": "priya.petrov41@example.com",
+    "phone": "+1 415 555 5505",
+    "skills": [
+      "PostgreSQL",
+      "Kubernetes",
+      "Redis",
+      "Svelte",
+      "Docker",
+      "Celery"
+    ],
+    "employment": [
+      {
+        "company": "Initech Software",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "Data Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Priya Rossi\npriya.rossi42@example.com | +1 415 555 9543 | Hillcrest\nSUMMARY\nEngineer with 5+ years of SQL experience.\nSKILLS\nSQL, FastAPI, Kubernetes, Redis, Terraform, TypeScript, Rust\nEXPERIENCE\nPlatform Engineer at Globex Systems (2018 - 2020)\nDelivered production services and mentored teammates.\nSoftware Developer at Initech Software (2013 - Present)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Northern Institute of Technology, 2012\nCERTIFICATIONS\nGoogle Professional Data Engineer\nHashiCorp Terraform Associate\nPROJECTS\nInventory Tracker - Redis service for internal use",
+  "gold": {
+    "full_name": "Priya Rossi",
+    "email": "priya.rossi42@example.com",
+    "phone": "+1 415 555 9543",
+    "skills": [
+      "SQL",
+      "FastAPI",
+      "Kubernetes",
+      "Redis",
+      "Terraform",
+      "TypeScript",
+      "Rust"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "Software Developer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [
+      "Google Professional Data Engineer",
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Kenji Nair\nkenji.nair43@example.com | +1 415 555 1782 | Hillcrest\nSUMMARY\nEngineer with 4+ years of Svelte experience.\nSKILLS\nSvelte, Docker, Celery, Terraform\nEXPERIENCE\nBackend Engineer at Acme Robotics (2012 - 2015)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Example University, 2016\nCERTIFICATIONS\nCertified Kubernetes Administrator\nPROJECTS\nResume Parser - Docker service for internal use\nRoute Planner - Docker service for internal use",
+  "gold": {
+    "full_name": "Kenji Nair",
+    "email": "kenji.nair43@example.com",
+    "phone": "+1 415 555 1782",
+    "skills": [
+      "Svelte",
+      "Docker",
+      "Celery",
+      "Terraform"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "Backend Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Resume Parser",
+      "Route Planner"
+    ]
+  }
+}
+{
+  "text": "Aarav Khan\naarav.khan44@example.com | +1 415 555 3446 | Rivertown\nSUMMARY\nEngineer with 2+ years of FastAPI experience.\nSKILLS\nFastAPI, Git, Terraform, PostgreSQL, Go, Kubernetes\nEXPERIENCE\nBackend Engineer, Acme Robotics, 2016-03 to 2019-06\nDelivered production services and mentored teammates.\nDevOps Engineer, Wayne Logistics, 2021-03 to 2024-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Riverside College, 2008\nPROJECTS\nResume Parser - Git service for internal use",
+  "gold": {
+    "full_name": "Aarav Khan",
+    "email": "aarav.khan44@example.com",
+    "phone": "+1 415 555 3446",
+    "skills": [
+      "FastAPI",
+      "Git",
+      "Terraform",
+      "PostgreSQL",
+      "Go",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Acme Robotics",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Wayne Logistics",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Riverside College"
+    ],
+    "certifications": [],
+    "projects": [
+      "Resume Parser"
+    ]
+  }
+}
+{
+  "text": "Aarav Garcia\naarav.garcia45@example.com | +1 415 555 1202 | Springfield\nSUMMARY\nEngineer with 6+ years of Redis experience.\nSKILLS\nRedis, Terraform, Docker, PostgreSQL, TypeScript, Go, Git\nEXPERIENCE\nML Engineer at Stark Data (2022 - Present)\nDelivered production services and mentored teammates.\nPlatform Engineer at Northwind Labs (2020 - Present)\nDelivered production services and mentored teammates.\nDevOps Engineer at Acme Robotics (2019 - 2021)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Lakeview University, 2009\nCERTIFICATIONS\nHashiCorp Terraform Associate\nAWS Certified Developer\nPROJECTS\nInventory Tracker - Redis service for internal use",
+  "gold": {
+    "full_name": "Aarav Garcia",
+    "email": "aarav.garcia45@example.com",
+    "phone": "+1 415 555 1202",
+    "skills": [
+      "Redis",
+      "Terraform",
+      "Docker",
+      "PostgreSQL",
+      "TypeScript",
+      "Go",
+      "Git"
+    ],
+    "employment": [
+      {
+        "company": "Stark Data",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Northwind Labs",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "AWS Certified Developer"
+    ],
+    "projects": [
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Priya Okafor\npriya.okafor46@example.com | +1 415 555 5313 | Rivertown\nSUMMARY\nEngineer with 2+ years of Kubernetes experience.\nSKILLS\nKubernetes, Terraform, Redis\nEXPERIENCE\nDevOps Engineer, Umbrella Analytics, 2018-03 to Present\nDelivered production services and mentored teammates.\nML Engineer, Acme Robotics, 2013-03 to 2014-06\nDelivered production services and mentored teammates.\nDevOps Engineer, Initech Software, 2015-03 to 2016-06\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Lakeview University, 2013\nCERTIFICATIONS\nCertified Kubernetes Administrator\nHashiCorp Terraform Associate\nPROJECTS\nChat Relay - Redis service for internal use\nInventory Tracker - Terraform service for internal use",
+  "gold": {
+    "full_name": "Priya Okafor",
+    "email": "priya.okafor46@example.com",
+    "phone": "+1 415 555 5313",
+    "skills": [
+      "Kubernetes",
+      "Terraform",
+      "Redis"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "DevOps Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "ML Engineer"
+      },
+      {
+        "company": "Initech Software",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "Certified Kubernetes Administrator",
+      "HashiCorp Terraform Associate"
+    ],
+    "projects": [
+      "Chat Relay",
+      "Inventory Tracker"
+    ]
+  }
+}
+{
+  "text": "Fatima Haddad\nfatima.haddad47@example.com | +1 415 555 2274 | Springfield\nSUMMARY\nEngineer with 5+ years of Git experience.\nSKILLS\nGit, PostgreSQL, Linux, Python, SQL, FastAPI, Celery\nEXPERIENCE\nPlatform Engineer at Globex Systems (2014 - Present)\nDelivered production services and mentored teammates.\nBackend Engineer at Globex Systems (2012 - Present)\nDelivered production services and mentored teammates.\nDevOps Engineer at Acme Robotics (2013 - 2014)\nDelivered production services and mentored teammates.\nEDUCATION\nBSc Computer Science, Example University, 2020\nCERTIFICATIONS\nHashiCorp Terraform Associate\nAWS Certified Developer\nPROJECTS\nLog Insight - Celery service for internal use",
+  "gold": {
+    "full_name": "Fatima Haddad",
+    "email": "fatima.haddad47@example.com",
+    "phone": "+1 415 555 2274",
+    "skills": [
+      "Git",
+      "PostgreSQL",
+      "Linux",
+      "Python",
+      "SQL",
+      "FastAPI",
+      "Celery"
+    ],
+    "employment": [
+      {
+        "company": "Globex Systems",
+        "title": "Platform Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Example University"
+    ],
+    "certifications": [
+      "HashiCorp Terraform Associate",
+      "AWS Certified Developer"
+    ],
+    "projects": [
+      "Log Insight"
+    ]
+  }
+}
+{
+  "text": "Noah Garcia\nnoah.garcia48@example.com | +1 415 555 5708 | Springfield\nSUMMARY\nEngineer with 3+ years of FastAPI experience.\nSKILLS\nFastAPI, PostgreSQL, Git, Terraform, Docker, Kubernetes\nEXPERIENCE\nSoftware Developer at Umbrella Analytics (2017 - 2018)\nDelivered production services and mentored teammates.\nPlatform Engineer at Acme Robotics (2016 - 2019)\nDelivered production services and mentored teammates.\nEDUCATION\nMSc Data Science, Lakeview University, 2012\nCERTIFICATIONS\nAWS Certified Developer\nCertified Kubernetes Administrator\nPROJECTS\nChat Relay - Docker service for internal use",
+  "gold": {
+    "full_name": "Noah Garcia",
+    "email": "noah.garcia48@example.com",
+    "phone": "+1 415 555 5708",
+    "skills": [
+      "FastAPI",
+      "PostgreSQL",
+      "Git",
+      "Terraform",
+      "Docker",
+      "Kubernetes"
+    ],
+    "employment": [
+      {
+        "company": "Umbrella Analytics",
+        "title": "Software Developer"
+      },
+      {
+        "company": "Acme Robotics",
+        "title": "Platform Engineer"
+      }
+    ],
+    "education": [
+      "Lakeview University"
+    ],
+    "certifications": [
+      "AWS Certified Developer",
+      "Certified Kubernetes Administrator"
+    ],
+    "projects": [
+      "Chat Relay"
+    ]
+  }
+}
+{
+  "text": "Elena Khan\nelena.khan49@example.com | +1 415 555 2489 | Springfield\nSUMMARY\nEngineer with 9+ years of Linux experience.\nSKILLS\nLinux, Kubernetes, PostgreSQL, TypeScript, Python, Redis, Docker\nEXPERIENCE\nBackend Engineer at Hooli Cloud (2012 - Present)\nDelivered production services and mentored teammates.\nDevOps Engineer at Globex Systems (2019 - 2021)\nDelivered production services and mentored teammates.\nEDUCATION\nBTech Information Technology, Northern Institute of Technology, 2017\nPROJECTS\nLog Insight - TypeScript service for internal use\nResume Parser - Docker service for internal use",
+  "gold": {
+    "full_name": "Elena Khan",
+    "email": "elena.khan49@example.com",
+    "phone": "+1 415 555 2489",
+    "skills": [
+      "Linux",
+      "Kubernetes",
+      "PostgreSQL",
+      "TypeScript",
+      "Python",
+      "Redis",
+      "Docker"
+    ],
+    "employment": [
+      {
+        "company": "Hooli Cloud",
+        "title": "Backend Engineer"
+      },
+      {
+        "company": "Globex Systems",
+        "title": "DevOps Engineer"
+      }
+    ],
+    "education": [
+      "Northern Institute of Technology"
+    ],
+    "certifications": [],
+    "projects": [
+      "Log Insight",
+      "Resume Parser"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Tuple
@@ -79,7 +80,7 @@ class AuthService:
             role=UserRole.RECRUITER,
             auth_provider=AuthProvider.GOOGLE,
             is_active=True,
-            is_verified=False,
+            is_verified=True,
         )
         db.add(new_user)
         await db.commit()
@@ -169,8 +170,8 @@ class AuthService:
             db: AsyncSession,
             request: GoogleOAuthRequest,
     ) -> Tuple[TokenResponse, User]:
-        # 1. Verify Google ID token
-        id_info = verify_google_id_token(request.id_token)
+        # 1. Verify Google ID token off the event loop (may fetch Google JWKS certs)
+        id_info = await asyncio.to_thread(verify_google_id_token, request.id_token)
 
         email = id_info.get("email")
         email_verified = id_info.get("email_verified", False)
@@ -187,11 +188,19 @@ class AuthService:
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
-        # 3. Register if user does not exist
+        # 3. Register if user does not exist (defensively normalize short/missing Google names)
         if not user:
+            fallback_name = email.split("@")[0].strip()
+            raw_name = (
+                    (id_info.get("name") or "").strip()
+                    or (id_info.get("given_name") or "").strip()
+                    or fallback_name
+            )
+            if len(raw_name) < 2:
+                raw_name = fallback_name if len(fallback_name) >= 2 else "Google User"
             register_request = UserGoogleRegisterRequest(
                 email=email,
-                name=id_info.get("name", email.split("@")[0]),
+                name=raw_name[:255],
             )
 
             user = await AuthService.register_user_google(
@@ -202,6 +211,9 @@ class AuthService:
         # 4. Reject inactive accounts
         if not user.is_active:
             raise UnauthorizedException("Account is inactive")
+
+        if not user.is_verified:
+            user.is_verified = True
 
         # 5. Issue access token
         access_token = create_access_token(
@@ -336,7 +348,7 @@ class AuthService:
         expected_email: str,
     ) -> Tuple[TokenResponse, User]:
         """Issue fresh tokens after verifying the authenticated user's Google email."""
-        id_info = verify_google_id_token(request.id_token)
+        id_info = await asyncio.to_thread(verify_google_id_token, request.id_token)
         email = id_info.get("email")
         if not email:
             raise UnauthorizedException("Google token does not contain an email address")
