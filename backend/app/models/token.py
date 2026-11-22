@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -15,6 +15,7 @@ class RefreshToken(BaseModel):
     Persistent refresh token record for tracking, rotating, and revoking JWT sessions.
     Stores only the cryptographic hash of the refresh token.
     """
+
     __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(

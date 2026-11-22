@@ -1,10 +1,11 @@
 from typing import TYPE_CHECKING, List, Optional
+
+from app.models.base import BaseModel
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import BaseModel
-
 if TYPE_CHECKING:
+    from app.models.job import Job
     from app.models.user import User
 
 
@@ -12,6 +13,7 @@ class Company(BaseModel):
     """
     Company model representing an organization registered in Job Sentry.
     """
+
     __tablename__ = "companies"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -23,6 +25,12 @@ class Company(BaseModel):
     # Relationships
     users: Mapped[List["User"]] = relationship(
         "User",
+        back_populates="company",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    jobs: Mapped[List["Job"]] = relationship(
+        "Job",
         back_populates="company",
         cascade="all, delete-orphan",
         lazy="selectin",

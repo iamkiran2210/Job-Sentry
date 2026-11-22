@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.user import UserPublicResponse
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 
 class CompanyCreateRequest(BaseModel):
@@ -59,3 +59,12 @@ class CompanyResponse(BaseModel):
 
 class CompanyMembersResponse(BaseModel):
     members: List[UserPublicResponse]
+
+
+class CompanyMemberGrantRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.lower()

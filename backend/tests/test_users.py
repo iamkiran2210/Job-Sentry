@@ -1,13 +1,14 @@
 import pytest
+from app.core.security import create_access_token
+from app.models.user import User
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
-from app.models.user import User
-
 
 @pytest.mark.asyncio
-async def test_get_current_user_profile(client: AsyncClient, registered_user: User, auth_headers: dict):
+async def test_get_current_user_profile(
+        client: AsyncClient, registered_user: User, auth_headers: dict
+):
     """Test retrieving current user profile with valid authentication."""
     response = await client.get("/api/v1/users/me", headers=auth_headers)
     assert response.status_code == 200

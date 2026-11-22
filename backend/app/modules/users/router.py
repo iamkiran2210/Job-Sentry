@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, status
-
+from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, require_role
 from app.models.user import User, UserRole
-from app.schemas.user import UserResponse
+from app.modules.users.service import UsersService
+from app.schemas.user import UserAccessOverview, UserResponse
 from app.utils.responses import success_response
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -20,6 +22,24 @@ async def get_current_user_profile(
     return success_response(
         data=UserResponse.model_validate(current_user).model_dump(mode="json"),
         message="Current user fetched successfully",
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.get(
+    "/me/access",
+    status_code=status.HTTP_200_OK,
+    summary="List my access",
+    description="Returns the current user's company membership and all accessible jobs with their access source and level.",
+)
+async def get_my_access(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
+    overview = await UsersService.get_access_overview(db, current_user)
+    return success_response(
+        data=UserAccessOverview.model_validate(overview).model_dump(mode="json"),
+        message="Access overview retrieved successfully",
         status_code=status.HTTP_200_OK,
     )
 

@@ -1,16 +1,14 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional, Tuple
 
 from app.core.exceptions import (
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     UnauthorizedException,
 )
 from app.core.security import (
+    DUMMY_PASSWORD_HASH,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -27,16 +25,18 @@ from app.schemas.auth import (
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
+    UserGoogleRegisterRequest,
 )
 from app.schemas.user import UserResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AuthService:
     """Service handling user registration, authentication, token rotation, and Google OAuth."""
 
     @staticmethod
-    async def register_user(db: AsyncSession, request: UserRegisterRequest) -> User:
-        """Register a new user with email and password."""
+    async def register_user(db: AsyncSession, request: UserRegisterRequest):
         email_normalized = request.email.lower().strip()
 
         # Check for duplicate email
@@ -63,6 +63,61 @@ class AuthService:
         return new_user
 
     @staticmethod
+    async def register_user_google(db: AsyncSession, request: UserGoogleRegisterRequest):
+        email_normalized = request.email.lower().strip()
+
+        # Check for duplicate email
+        result = await db.execute(select(User).where(User.email == email_normalized))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise ConflictException(f"User with email '{email_normalized}' already exists")
+
+        new_user = User(
+            name=request.name.strip(),
+            email=email_normalized,
+            password_hash=None,
+            role=UserRole.RECRUITER,
+            auth_provider=AuthProvider.GOOGLE,
+            is_active=True,
+            is_verified=False,
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        return new_user
+
+    @staticmethod
+    async def register_user_by_admin(
+        db: AsyncSession, request: UserRegisterRequest, *, company_id: uuid.UUID
+    ) -> User:
+        """Register a new user with email and password."""
+        email_normalized = request.email.lower().strip()
+
+        # Check for duplicate email
+        result = await db.execute(select(User).where(User.email == email_normalized))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise ConflictException(f"User with email '{email_normalized}' already exists")
+
+        # Hash password with Argon2
+        password_hashed = hash_password(request.password)
+
+        new_user = User(
+            name=request.name.strip(),
+            email=email_normalized,
+            password_hash=password_hashed,
+            role=UserRole.RECRUITER,
+            auth_provider=AuthProvider.EMAIL,
+            company_id=company_id,
+            is_active=True,
+            is_verified=False,
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        return new_user
+
+    @staticmethod
     async def login_user(db: AsyncSession, request: UserLoginRequest) -> Tuple[TokenResponse, User]:
         """Authenticate user by email and password, issuing access and refresh tokens."""
         email_normalized = request.email.lower().strip()
@@ -71,18 +126,18 @@ class AuthService:
         user = result.scalar_one_or_none()
 
         if not user:
+            verify_password(request.password, DUMMY_PASSWORD_HASH)
             raise UnauthorizedException("Invalid email or password")
 
         if not user.password_hash:
-            raise UnauthorizedException(
-                f"This account was registered using {user.auth_provider.value}. Please log in using that provider."
-            )
+            verify_password(request.password, DUMMY_PASSWORD_HASH)
+            raise UnauthorizedException("Invalid email or password")
 
         if not verify_password(request.password, user.password_hash):
             raise UnauthorizedException("Invalid email or password")
 
         if not user.is_active:
-            raise ForbiddenException("User account is deactivated")
+            raise UnauthorizedException("Invalid email or password")
 
         # Issue tokens
         access_token = create_access_token(
@@ -110,6 +165,75 @@ class AuthService:
         return token_response, user
 
     @staticmethod
+    async def sign_in_with_google(
+            db: AsyncSession,
+            request: GoogleOAuthRequest,
+    ) -> Tuple[TokenResponse, User]:
+        # 1. Verify Google ID token
+        id_info = verify_google_id_token(request.id_token)
+
+        email = id_info.get("email")
+        email_verified = id_info.get("email_verified", False)
+
+        if not email:
+            raise UnauthorizedException("Google token does not contain an email address")
+
+        if not email_verified:
+            raise UnauthorizedException("Google email address is not verified")
+
+        email = email.lower().strip()
+
+        # 2. Check whether user already exists
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        # 3. Register if user does not exist
+        if not user:
+            register_request = UserGoogleRegisterRequest(
+                email=email,
+                name=id_info.get("name", email.split("@")[0]),
+            )
+
+            user = await AuthService.register_user_google(
+                db,
+                register_request,
+            )
+
+        # 4. Reject inactive accounts
+        if not user.is_active:
+            raise UnauthorizedException("Account is inactive")
+
+        # 5. Issue access token
+        access_token = create_access_token(
+            subject=str(user.id),
+            role=user.role.value,
+            company_id=(str(user.company_id) if user.company_id else None),
+        )
+
+        # 6. Issue refresh token
+        raw_refresh_token, expire_at = create_refresh_token(subject=str(user.id))
+
+        refresh_token_record = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_refresh_token),
+            expires_at=expire_at,
+        )
+
+        db.add(refresh_token_record)
+        await db.commit()
+        await db.refresh(user)
+
+        # 7. Return tokens
+        token_response = TokenResponse(
+            access_token=access_token,
+            refresh_token=raw_refresh_token,
+            token_type="bearer",
+            user=UserResponse.model_validate(user),
+        )
+
+        return token_response, user
+
+    @staticmethod
     async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenRefreshResponse:
         """Validate refresh token, enforce single-use rotation, and issue new tokens."""
         if not refresh_token:
@@ -131,9 +255,7 @@ class AuthService:
 
         # Look up persistent token record using cryptographic hash
         token_hash = hash_token(refresh_token)
-        result = await db.execute(
-            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-        )
+        result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
         token_record = result.scalar_one_or_none()
 
         if not token_record:
@@ -188,12 +310,17 @@ class AuthService:
         )
 
     @staticmethod
-    async def logout_user(db: AsyncSession, refresh_token: Optional[str] = None) -> None:
+    async def logout_user(
+        db: AsyncSession, refresh_token: Optional[str] = None, *, user_id: uuid.UUID
+    ) -> None:
         """Revoke the given refresh token to invalidate the session."""
         if refresh_token:
             token_hash = hash_token(refresh_token)
             result = await db.execute(
-                select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+                select(RefreshToken).where(
+                    RefreshToken.token_hash == token_hash,
+                    RefreshToken.user_id == user_id,
+                )
             )
             token_record = result.scalar_one_or_none()
             if token_record and token_record.revoked_at is None:
@@ -201,10 +328,15 @@ class AuthService:
                 await db.commit()
 
     @staticmethod
-    async def authenticate_google(db: AsyncSession, request: GoogleOAuthRequest) -> Tuple[TokenResponse, User]:
-        """Authenticate or register user via verified Google ID token."""
+    async def authenticate_google(
+        db: AsyncSession,
+        request: GoogleOAuthRequest,
+        *,
+        expected_user_id: uuid.UUID,
+        expected_email: str,
+    ) -> Tuple[TokenResponse, User]:
+        """Issue fresh tokens after verifying the authenticated user's Google email."""
         id_info = verify_google_id_token(request.id_token)
-
         email = id_info.get("email")
         if not email:
             raise UnauthorizedException("Google token does not contain an email address")
@@ -214,31 +346,17 @@ class AuthService:
             raise UnauthorizedException("Google email address is not verified")
 
         email_normalized = email.lower().strip()
-        name = id_info.get("name", email_normalized.split("@")[0]).strip()
-
-        result = await db.execute(select(User).where(User.email == email_normalized))
+        if email_normalized != expected_email.lower().strip():
+            raise ForbiddenException("Google account does not match the authenticated account")
+        result = await db.execute(select(User).where(User.id == expected_user_id))
         user = result.scalar_one_or_none()
 
-        if user:
-            if not user.is_active:
-                raise ForbiddenException("User account is deactivated")
-            # Account linking: mark verified if Google has verified the email
-            if not user.is_verified:
-                user.is_verified = True
-        else:
-            # Create new user via Google OAuth
-            user = User(
-                name=name,
-                email=email_normalized,
-                password_hash=None,
-                role=UserRole.RECRUITER,
-                auth_provider=AuthProvider.GOOGLE,
-                is_active=True,
-                is_verified=True,
-            )
-            db.add(user)
-            await db.flush()
-
+        if not user or not user.is_active:
+            raise ForbiddenException("Authenticated account is unavailable")
+        # This authenticated operation links a verified Google identity; it cannot create
+        # an account or issue a session for a different account.
+        if not user.is_verified:
+            user.is_verified = True
         # Issue tokens
         access_token = create_access_token(
             subject=str(user.id),

@@ -1,7 +1,13 @@
 import os
 from typing import AsyncGenerator
-import pytest
+from urllib.parse import urlsplit
+
 import pytest_asyncio
+from app.core.database import Base, get_db
+from app.core.security import create_access_token, hash_password
+from app.main import app
+from app.models.company import Company
+from app.models.user import AuthProvider, User, UserRole
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -10,17 +16,18 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
-from app.core.security import create_access_token, hash_password
-from app.main import app
-from app.models.company import Company
-from app.models.user import AuthProvider, User, UserRole
-
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Provide a fresh, isolated database schema for each test."""
     test_db_url = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    parsed_url = urlsplit(test_db_url)
+    database_name = parsed_url.path.rsplit("/", 1)[-1]
+    if (
+            not ("sqlite" in parsed_url.scheme and database_name in {"", ":memory:"})
+            and "test" not in database_name.casefold()
+    ):
+        raise RuntimeError("TEST_DATABASE_URL must point to a database whose name contains 'test'")
 
     if "sqlite" in test_db_url:
         engine = create_async_engine(
@@ -57,6 +64,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Provide an HTTP async test client with database dependency override."""
+
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
