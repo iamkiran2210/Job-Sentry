@@ -1,0 +1,138 @@
+@import '@fontsource-variable/dm-sans';
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    --background: #f6f8fc;
+    --foreground: #172033;
+    --card: #ffffff;
+    --card-foreground: #172033;
+    --popover: #ffffff;
+    --popover-foreground: #172033;
+    --primary: #2457d6;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f4f9;
+    --secondary-foreground: #172033;
+    --muted: #f1f4f9;
+    --muted-foreground: #1e293b;
+    --accent: #d9ad55;
+    --accent-foreground: #101d35;
+    --destructive: #dc5353;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #2457d6;
+    --radius: 0.5rem;
+
+    --sidebar: #101d35;
+    --sidebar-foreground: #f6f8fc;
+    --sidebar-primary: #2457d6;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #192b4d;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #1f3660;
+    --sidebar-ring: #2457d6;
+  }
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-navy: #101d35;
+  --color-brand: #2457d6;
+  --color-gold: #d9ad55;
+  --color-canvas: #f6f8fc;
+  --color-ink: #172033;
+  --color-success: #16a36a;
+  --color-warning: #e9a23b;
+  --color-danger: #dc5353;
+
+  --font-sans: 'DM Sans Variable', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 640px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-weight: 450;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6,
+strong, b,
+.font-extrabold,
+.font-bold,
+[data-slot*="title"] {
+  font-family: var(--font-sans);
+  font-weight: 700 !important;
+}
+
+.font-semibold, th {
+  font-family: var(--font-sans);
+  font-weight: 600 !important;
+}
+
+p, span, td, dd, dt, li, label, input, textarea, select {
+  font-weight: 450;
+}
+
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+@keyframes js-pulse { 50% { opacity: .5; } }
+.skeleton { background: #e6ebf3; border-radius: 6px; animation: js-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+button, a, [role="button"], input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button, a { transition: background-color .12s, border-color .12s, opacity .12s; }
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

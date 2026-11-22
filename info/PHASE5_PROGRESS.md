@@ -1,0 +1,178 @@
+## F0 baseline and audit (2026-11-08)
+
+Baseline: `tests` — 360 passed, 2 skipped in 129.25s; `tests/ai_features` — 126 passed, 2 skipped in 47.80s; Alembic has
+one head, `a91d6e4f2b70`.
+Added Ruff and strict mypy dev declarations/configuration and created `CODEBASE_AUDIT.md`; vulture, pip-audit,
+detect-secrets and gitleaks are unavailable, and offline installation cannot fetch the mypy wheel, so those checks are
+NOT VERIFIED.
+Migration files `4c8d6f1a2e73`, `7a4d91c2e6b3`, `9b1c4f6e2a71`, `a5475d55ef43`, and `f2c3a01d84b7` are modified in the
+worktree; left untouched and uncommitted for owner review.
+F0 is complete; the audit records open cleanup tasks, including broad exception handling, an async embedding call, and
+the candidate-list N+1 query. No application database was used.
+
+## F1 architecture (2026-11-08)
+
+Added `ARCHITECTURE.md` describing the current layers, modules, dependency direction and a target tree that follows the
+existing feature-module layout.
+The guide explicitly treats the untracked `app/ai_features` tree as an integration boundary pending ownership/track
+review; no source files were moved.
+Validation: full suite — 360 passed, 2 skipped in 127.76s.
+
+## F1 unused imports and dead code (2026-11-08)
+
+Removed confirmed unused imports from `app/core/dependencies.py`, auth router/service, and candidate-intelligence
+models/service; relationship-registration imports were preserved.
+The custom AST import scan was a screening aid only; complete dead-code detection remains NOT VERIFIED until
+Ruff/vulture are available offline.
+Validation: full suite — 360 passed, 2 skipped in 129.54s.
+
+## F1 timezone audit (2026-11-08)
+
+Reviewed all `datetime.now`/`utcnow`/`fromtimestamp` calls, mapped `DateTime` columns and migrations; clocks are
+UTC-aware and mapped timestamps use timezone-aware columns, so no code or migration change was needed.
+Corrected the audit: the resume `as_utc` helper re-exports the shared clock and is not a duplicate clock implementation.
+Validation: full suite — 360 passed, 2 skipped in 135.62s.
+
+## F1 exception handling (2026-11-08)
+
+Google ID-token verification now masks provider exception text from 401 responses and logs only the exception type;
+malformed CORS JSON catches `JSONDecodeError`, and the audit distinguishes rollback-and-reraise cleanup from swallowed
+errors.
+Regression: `tests/test_security_exception_safety.py::test_google_token_errors_do_not_expose_provider_details` — 2
+parameter cases pass.
+Validation: full suite — 362 passed, 2 skipped in 138.47s. An auth subset run without PostgreSQL stalled in the SQLite
+fixture and was interrupted; it is not counted as passing evidence.
+
+## F1 blocking calls (2026-11-08)
+
+Synchronous embedding provider work in asynchronous scoring now runs in Starlette's thread pool; the provider Protocol
+remains synchronous for simple mocks and CPU-bound implementations.
+Regression:
+`tests/candidate_intelligence/test_nonblocking_embedding.py::test_sync_embedding_does_not_block_the_event_loop` passes
+after first failing against the blocking implementation.
+Validation: full suite — 363 passed, 2 skipped in 133.09s.
+
+## F3 application status workflow (2026-11-08)
+
+Added revision `c2f6b1a8d904` after `a91d6e4f2b70`, with reversible status normalization, an append-only status history
+table, and the user-facing status PATCH/history endpoints. Legacy mapping: `processing` stays processing, `analyzing`
+maps to processing, `completed`/`analyzed` map to analyzed, existing shortlisted/rejected/withdrawn values remain, and
+all other values map to applied; the backup table restores exact legacy strings on downgrade.
+Workers now record `applied → processing → analyzed`; terminal processing failures reset to applied. Rejection requires
+a reason; user/system actor rules and tenant/job authorization are enforced.
+Passing coverage: `tests/candidate_intelligence/test_application_status_workflow.py` (29 cases),
+`tests/candidate_intelligence/test_migration_roundtrip.py::test_postgres_migration_roundtrip_and_phase1_to_3_data_survival`,
+and resume worker API/pipeline tests.
+Validation: full suite — 391 passed, 2 skipped in 135.11s. Alembic fixture `check` reports no drift; round trip
+preserves schema and `vector`.
+
+## F4 candidate analysis (2026-11-08)
+
+Extended analysis additively with candidate/profile, sanitized resume metadata, application status history, latest
+verification, score/rank details, grouped evidence, and a persisted-score deterministic summary. Protected profile keys
+are excluded; contact details and verification contact metadata are masked unless the existing same-company access path
+grants PII access.
+Added revision `d7f43ae83c10` for `score_explanation`; its downgrade removes only its table and indexes. Added
+structured explanation output validation and persistence: citations outside the current score are dropped, empty cited
+output becomes unavailable, generation timeout/failure is recorded, and cached output is reused by input
+hash/model/prompt version. The rank path queues generation only when the configured provider is Pydantic AI; GET does
+not invoke a generator.
+Passing tests:
+`tests/candidate_intelligence/test_analysis_detail.py::test_analysis_returns_full_detail_and_does_not_write_or_score`;
+`tests/candidate_intelligence/test_explanations.py::test_explanation_drops_items_without_evidence_from_current_score`,
+`test_explanation_with_no_valid_evidence_is_unavailable`, and
+`test_generated_explanation_uses_persisted_data_and_caches`; migration fixture and round-trip tests in
+`test_alembic_fixture.py` and `test_migration_roundtrip.py`.
+Validation: full suite — 395 passed, 2 skipped in 147.08s. Alembic round trip and drift check — 6 passed in 16.27s. The
+worker task path depends on the existing untracked `app/ai_features` tree; it is not independently verified outside the
+default mocked suite.
+
+## F5 comparison (2026-11-08)
+
+Added `POST /api/v1/jobs/{job_id}/compare` with a strict 2–4 unique ID request, authorized job access, same-job/company
+checks, current-version persisted-score requirement, and a read-only comparison assembled in request order. Comparison
+includes category contributions, per-skill exact/alias/semantic/none/unknown status, mandatory counts, latest
+verification status, deterministic evidence-backed differences, and a no-recommendation disclaimer. It does not invoke
+scoring or an LLM.
+Passing coverage:
+`tests/candidate_intelligence/test_comparison.py::test_comparison_request_requires_two_to_four_unique_ids`,
+`test_comparison_is_job_scoped_read_only_and_reports_evidence_differences` (2, 3 and 4 application cases), and
+`test_compare_endpoint_preserves_requested_order_and_never_scores`.
+The service tests assert deterministic repeated output, preserved order, evidence difference types, 409 for missing
+current scores, 422 for other-job and other-company IDs, and unchanged score-row count. The API contract is exercised
+for a valid two-application request.
+Validation: full suite — 400 passed, 2 skipped in 151.24s. No new migration. Comparison response edge validation for
+every 1/5 ID API case and the exhaustive protected-attribute response audit remain NOT VERIFIED.
+
+## F6 analytics (2026-11-08)
+
+Added authenticated company-scoped SQL analytics routes for overview, jobs, candidates, skills, and pipeline. Date
+filters use UTC half-open ranges for inclusive dates; ranges over 366 days and inverted ranges return 422; cross-company
+job filters return 404 and mismatched company filters return 403. Aggregates run in SQL, latest scores are restricted to
+the current scoring version, and analytics schemas expose no demographic fields.
+Passing coverage:
+`tests/candidate_intelligence/test_analytics.py::test_analytics_overview_and_jobs_are_sql_aggregated_and_company_scoped`
+asserts hand-computed KPIs, score distributions, verification distribution, skills coverage, pipeline counts, a 23:59:
+59Z end-boundary record, company isolation, sort allowlist, and date cap.
+Validation: full suite — 401 passed, 2 skipped in 149.90s. No new migration was needed. Empty-database endpoint
+behavior, multi-company membership (the current user model has only one `company_id`), query-count bounds, Redis
+analytics caching, and EXPLAIN output on 10k rows remain NOT VERIFIED. Pipeline processing duration is derived from the
+existing resume start/completion timestamps; no separate `processing_run` table exists.
+
+## F7 health, readiness, and request logging (2026-11-08)
+
+Replaced the old health payload with public `/health` liveness fields and added `/ready` dependency checks for database,
+Redis, migration head, storage writability, and live-worker count. Readiness bodies omit internal error details; missing
+workers are degraded unless `READY_REQUIRE_WORKER` is enabled. Added UUID request-ID echo/generation, context
+propagation, JSON request logs using route templates, nested key redaction, and request IDs in error bodies. Added typed
+readiness/log settings and the Redis runtime dependency declaration.
+Passing coverage: `tests/test_health.py::test_health_is_liveness_only_and_returns_minimal_fields`,
+`test_ready_reports_minimal_checks_and_degraded_missing_worker`, `test_ready_returns_503_without_dependency_details` (4
+simulated failures), `test_request_id_is_echoed_logged_and_error_body_uses_same_id`,
+`test_redaction_masks_nested_secrets_and_pii`, and `test_worker_heartbeat_sets_45_second_ttl`.
+Validation: full suite — 410 passed, 2 skipped in 153.60s; health subset — 9 passed in 0.88s. No migration was needed.
+Celery periodic heartbeat registration, heartbeat behavior in a running worker, Sentry-backed reporting and integration
+of the no-op reporter with the 5xx handler remain NOT VERIFIED; logs also still need task ID/request ID propagation for
+Celery tasks.
+
+## F8 security review (partial, 2026-11-08)
+
+Added `docs/SECURITY_REVIEW.md` from inspected source and tests. Fixed JWT access/refresh lifetime caps, required
+issuer/audience/issued-at claims, production secret validation, production debug/docs shutdown, and response security
+headers.
+New test-first coverage:
+`tests/test_security_hardening.py::test_access_tokens_have_bounded_lifetime_and_validated_issuer_audience`,
+`test_production_settings_reject_missing_short_or_placeholder_secret`,
+`test_production_settings_force_debug_and_docs_off`, and `test_security_headers_are_added_to_json_responses` (6 passing
+cases).
+Validation: full suite — 416 passed, 2 skipped in 146.82s; focused security tests — 6 passed in 0.06s.
+F8 remains NOT COMPLETE: route-wide tenant/auth checks, rate limiting, CORS allowlists, upload traversal/stream tests,
+Sentry/reporting, dependency scan, and several auth lifecycle controls remain open; see `docs/SECURITY_REVIEW.md`.
+Follow-up: a test first exposed the local-origin regex accepting `http://localhost:9999`; removed that regex and
+wildcard CORS methods/headers. Regression
+`tests/test_security_hardening.py::test_cors_rejects_origins_outside_the_configured_list` passes (7 security tests
+total). Full suite after the fix: 417 passed, 2 skipped in 149.17s.
+F8 follow-up: protected user provisioning, authenticated/scoped logout, and same-account Google identity linking; login
+failures are generic and perform dummy Argon2 verification for missing/provider accounts. Storage keys now consist only
+of the server-generated resume UUID; local storage escape and symlink attempts are covered.
+Passing tests: `tests/test_security_hardening.py::test_only_documented_auth_and_liveness_routes_are_public`;
+`tests/test_auth.py::test_registration_requires_company_admin`, `test_logout_requires_authentication`,
+`test_logout_cannot_revoke_another_users_refresh_token`,
+`test_login_failure_is_generic_for_unknown_and_provider_accounts`, and
+`test_google_link_cannot_issue_tokens_for_another_account`; storage and upload validation — 14 passed, 1 skipped.
+Validation: auth plus route audit — 21 passed in 18.51s; full suite — 423 passed, 2 skipped in 154.27s. F8 is still open
+for Redis rate limiting, upload early content-length/midstream handling, dependency/secret scanners,
+trusted-host/proxy/body limits, and Sentry/task-log integration.
+F8 reporting follow-up: wired the no-op error reporter and optional Sentry reporter into unhandled 500 handling. Sentry
+is configured with `send_default_pii=False`, request-id tags and the recursive scrubber; local logs record exception
+type/frames without exception text. Added `SENTRY_DSN` and declared `sentry-sdk>=2.0` in the project/runtime
+requirements.
+Passing tests: `tests/test_security_hardening.py::test_sentry_reporter_initializes_without_pii_and_scrubs_events` and
+`test_unhandled_exception_reports_request_id_without_logging_exception_text`.
+Lock refresh resolved `sentry-sdk v2.74.0`, but the shared lockfile contains other pre-existing workspace changes and is
+not committed as a whole. Remaining F8 gaps: Redis rate limiting, early upload size enforcement, trusted-host/proxy/body
+limits, dependency and secret scans, and Celery task id/request-id log propagation.
+Validation after reporting integration: full suite — 425 passed, 2 skipped in 154.26s.
+Generated `docs/API_ENDPOINTS.md` from `app.openapi()` after the passing test run; it documents all 54 OpenAPI
+operations with parameters, request bodies, status responses, and referenced schemas. Run
+`uv run --project backend python scripts/export_endpoint_markdown.py` to refresh it.
