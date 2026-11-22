@@ -1,12 +1,12 @@
 """Shared plain data types for the independently testable intelligence layers."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from decimal import Decimal
-from typing import Any, Literal, Mapping
 from datetime import date
+from decimal import Decimal
 from types import MappingProxyType
-
+from typing import Any, Literal, Mapping
 
 VerificationStatus = Literal["passed", "needs_review", "not_verified", "failed"]
 
@@ -14,6 +14,7 @@ VerificationStatus = Literal["passed", "needs_review", "not_verified", "failed"]
 @dataclass(frozen=True)
 class ScoringInputs:
     """Allowlisted immutable candidate/job data; identity/proxy fields have no slots."""
+
     skills: tuple[Mapping[str, Any], ...]
     experience: tuple[Mapping[str, Any], ...]
     projects: tuple[Mapping[str, Any], ...]
@@ -23,8 +24,17 @@ class ScoringInputs:
     as_of: date
 
     def __post_init__(self) -> None:
-        for field_name in ("skills", "experience", "projects", "education", "certifications", "requirements"):
-            object.__setattr__(self, field_name, tuple(_freeze(item) for item in getattr(self, field_name)))
+        for field_name in (
+                "skills",
+                "experience",
+                "projects",
+                "education",
+                "certifications",
+                "requirements",
+        ):
+            object.__setattr__(
+                self, field_name, tuple(_freeze(item) for item in getattr(self, field_name))
+            )
 
 
 def _freeze(value: Any) -> Any:

@@ -5,7 +5,11 @@ from app.models.company import Company
 from app.models.job import Job
 from app.models.job_access import JobAccess, JobAccessLevel
 from app.models.user import User
-from app.schemas.user import CompanyAccessSummary, UserAccessOverview, UserJobAccessSummary
+from app.schemas.user import (
+    CompanyAccessSummary,
+    UserAccessOverview,
+    UserJobAccessSummary,
+)
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

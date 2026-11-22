@@ -8,7 +8,11 @@ from app.core.exceptions import (
 )
 from app.models.company import Company
 from app.models.user import User, UserRole
-from app.schemas.company import CompanyCreateRequest, CompanyMemberGrantRequest, CompanyUpdateRequest
+from app.schemas.company import (
+    CompanyCreateRequest,
+    CompanyMemberGrantRequest,
+    CompanyUpdateRequest,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,9 +71,7 @@ class CompaniesService:
         if not current_user.company_id:
             raise NotFoundException("User does not belong to any company")
 
-        result = await db.execute(
-            select(Company).where(Company.id == current_user.company_id)
-        )
+        result = await db.execute(select(Company).where(Company.id == current_user.company_id))
         company = result.scalar_one_or_none()
 
         if not company:
@@ -93,9 +95,7 @@ class CompaniesService:
         if current_user.role != UserRole.ADMIN:
             raise ForbiddenException("Only company administrators can update company information")
 
-        result = await db.execute(
-            select(Company).where(Company.id == current_user.company_id)
-        )
+        result = await db.execute(select(Company).where(Company.id == current_user.company_id))
         company = result.scalar_one_or_none()
 
         if not company:
@@ -166,6 +166,60 @@ class CompaniesService:
         if member is None:
             raise NotFoundException("Company member not found")
         if member.role == UserRole.ADMIN:
-            raise ConflictException("Company administrators cannot be removed through member access management")
+            raise ConflictException(
+                "Company administrators cannot be removed through member access management"
+            )
         member.company_id = None
         await db.commit()
+
+    @staticmethod
+    async def remove_all_company_members(
+            db: AsyncSession,
+            current_user: User,
+    ) -> dict[str, int]:
+        """Data Explorer bulk action: remove all non-admin team members from the company while preserving admins."""
+        from app.models.job import Job
+        from app.models.job_access import JobAccess
+        from sqlalchemy import delete
+
+        CompaniesService._require_company_admin(current_user)
+        members = list(
+            (
+                await db.execute(
+                    select(User).where(User.company_id == current_user.company_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        removable = [
+            m for m in members if m.role != UserRole.ADMIN and m.id != current_user.id
+        ]
+        admins_preserved = len(members) - len(removable)
+
+        if removable:
+            removable_ids = [m.id for m in removable]
+            job_ids = list(
+                (
+                    await db.execute(
+                        select(Job.id).where(Job.company_id == current_user.company_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if job_ids:
+                await db.execute(
+                    delete(JobAccess).where(
+                        JobAccess.job_id.in_(job_ids),
+                        JobAccess.user_id.in_(removable_ids),
+                    )
+                )
+            for m in removable:
+                m.company_id = None
+            await db.commit()
+
+        return {
+            "members_removed": len(removable),
+            "admins_preserved": admins_preserved,
+        }

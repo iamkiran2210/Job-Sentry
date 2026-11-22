@@ -1,10 +1,10 @@
 import enum
 import uuid
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, Enum, ForeignKey, String, Uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+from sqlalchemy import Boolean, Enum, ForeignKey, String, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from app.models.company import Company
@@ -25,6 +25,7 @@ class User(BaseModel):
     """
     User model representing an authenticated user (administrator or recruiter).
     """
+
     __tablename__ = "users"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)

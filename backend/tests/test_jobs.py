@@ -19,7 +19,8 @@ JOB_PAYLOAD = {
 
 def headers_for(user: User) -> dict[str, str]:
     token = create_access_token(
-        subject=str(user.id), role=user.role.value,
+        subject=str(user.id),
+        role=user.role.value,
         company_id=str(user.company_id) if user.company_id else None,
     )
     return {"Authorization": f"Bearer {token}"}
@@ -36,7 +37,11 @@ async def test_job_crud_and_draft_deletion(client: AsyncClient, company_with_adm
     assert listed.status_code == 200
     assert len(listed.json()["data"]) == 1
 
-    updated = await client.put(f"/api/v1/jobs/{job_id}", json={"title": "Staff Engineer"}, headers=admin_headers)
+    updated = await client.put(
+        f"/api/v1/jobs/{job_id}",
+        json={"title": "Staff Engineer"},
+        headers=admin_headers,
+    )
     assert updated.status_code == 200
     assert updated.json()["data"]["title"] == "Staff Engineer"
 
@@ -51,8 +56,13 @@ async def test_recruiter_can_manage_jobs_within_company(
 ):
     company, _ = company_with_admin
     recruiter = User(
-        name="Recruiter", email="jobs-recruiter@example.com", role=UserRole.RECRUITER,
-        company_id=company.id, auth_provider=AuthProvider.EMAIL, is_active=True, is_verified=True,
+        name="Recruiter",
+        email="jobs-recruiter@example.com",
+        role=UserRole.RECRUITER,
+        company_id=company.id,
+        auth_provider=AuthProvider.EMAIL,
+        is_active=True,
+        is_verified=True,
     )
     db_session.add(recruiter)
     await db_session.commit()
@@ -129,23 +139,30 @@ async def test_admin_can_grant_viewer_or_editor_access_to_one_job(
         f"/api/v1/jobs/{job_id}", json={"title": "Shared edit"}, headers=auth_headers
     )
     assert edited.status_code == 200
-    assert (await client.get(access_url, headers=admin_headers)).json()["data"][0]["access_level"] == "editor"
+    assert (await client.get(access_url, headers=admin_headers)).json()["data"][0][
+               "access_level"
+           ] == "editor"
 
-    revoked = await client.delete(
-        f"{access_url}/{registered_user.id}", headers=admin_headers
-    )
+    revoked = await client.delete(f"{access_url}/{registered_user.id}", headers=admin_headers)
     assert revoked.status_code == 200
     assert (await client.get(f"/api/v1/jobs/{job_id}", headers=auth_headers)).status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_company_isolation_and_missing_membership(client: AsyncClient, admin_headers, db_session):
+async def test_company_isolation_and_missing_membership(
+        client: AsyncClient, admin_headers, db_session
+):
     company = Company(name="Other Org")
     db_session.add(company)
     await db_session.flush()
     other_user = User(
-        name="Other Admin", email="other-admin@example.com", role=UserRole.ADMIN,
-        company_id=company.id, auth_provider=AuthProvider.EMAIL, is_active=True, is_verified=True,
+        name="Other Admin",
+        email="other-admin@example.com",
+        role=UserRole.ADMIN,
+        company_id=company.id,
+        auth_provider=AuthProvider.EMAIL,
+        is_active=True,
+        is_verified=True,
     )
     db_session.add(other_user)
     await db_session.commit()
@@ -156,8 +173,12 @@ async def test_company_isolation_and_missing_membership(client: AsyncClient, adm
 
 
 @pytest.mark.asyncio
-async def test_status_transitions_and_preference_weight_validation(client, company_with_admin, admin_headers):
-    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()["data"]["id"]
+async def test_status_transitions_and_preference_weight_validation(
+        client, company_with_admin, admin_headers
+):
+    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()[
+        "data"
+    ]["id"]
     paused = await client.post(f"/api/v1/jobs/{job_id}/pause", headers=admin_headers)
     assert paused.status_code == 409
     published = await client.post(f"/api/v1/jobs/{job_id}/publish", headers=admin_headers)
@@ -176,15 +197,25 @@ async def test_status_transitions_and_preference_weight_validation(client, compa
 
 @pytest.mark.asyncio
 async def test_requirement_crud_and_publish_weight_total(client, company_with_admin, admin_headers):
-    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()["data"]["id"]
+    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()[
+        "data"
+    ]["id"]
     requirements_url = f"/api/v1/jobs/{job_id}/requirements"
     mandatory = {
-        "category": "experience", "name": "5 years experience", "requirement_type": "mandatory",
-        "importance": "high", "weight": 0, "is_mandatory": True,
+        "category": "experience",
+        "name": "5 years experience",
+        "requirement_type": "mandatory",
+        "importance": "high",
+        "weight": 0,
+        "is_mandatory": True,
     }
     preferred_a = {
-        "category": "skills", "name": "Python", "requirement_type": "preferred",
-        "importance": "high", "weight": 0.7, "is_mandatory": False,
+        "category": "skills",
+        "name": "Python",
+        "requirement_type": "preferred",
+        "importance": "high",
+        "weight": 0.7,
+        "is_mandatory": False,
     }
     preferred_b = {**preferred_a, "name": "PostgreSQL", "weight": 0.2}
     must = await client.post(requirements_url, json=mandatory, headers=admin_headers)
@@ -192,16 +223,24 @@ async def test_requirement_crud_and_publish_weight_total(client, company_with_ad
     first = await client.post(requirements_url, json=preferred_a, headers=admin_headers)
     second = await client.post(requirements_url, json=preferred_b, headers=admin_headers)
     assert first.status_code == second.status_code == 201
-    assert (await client.post(f"/api/v1/jobs/{job_id}/publish", headers=admin_headers)).status_code == 400
+    assert (
+               await client.post(f"/api/v1/jobs/{job_id}/publish", headers=admin_headers)
+           ).status_code == 400
 
     second_id = second.json()["data"]["id"]
-    fixed = await client.put(f"{requirements_url}/{second_id}", json={"weight": 0.3}, headers=admin_headers)
+    fixed = await client.put(
+        f"{requirements_url}/{second_id}", json={"weight": 0.3}, headers=admin_headers
+    )
     assert fixed.status_code == 200
-    assert (await client.post(f"/api/v1/jobs/{job_id}/publish", headers=admin_headers)).status_code == 200
+    assert (
+               await client.post(f"/api/v1/jobs/{job_id}/publish", headers=admin_headers)
+           ).status_code == 200
     items = (await client.get(requirements_url, headers=admin_headers)).json()["data"]
     assert len(items) == 3
 
-    delete = await client.delete(f"{requirements_url}/{first.json()['data']['id']}", headers=admin_headers)
+    delete = await client.delete(
+        f"{requirements_url}/{first.json()['data']['id']}", headers=admin_headers
+    )
     assert delete.status_code == 400
 
 
@@ -209,13 +248,19 @@ async def test_requirement_crud_and_publish_weight_total(client, company_with_ad
 async def test_requirement_weights_accept_decimals_and_mandatory_can_be_toggled(
         client, company_with_admin, admin_headers
 ):
-    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()["data"]["id"]
+    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()[
+        "data"
+    ]["id"]
     requirements_url = f"/api/v1/jobs/{job_id}/requirements"
     create = await client.post(
         requirements_url,
         json={
-            "category": "skills", "name": "Python", "requirement_type": "preferred",
-            "importance": "high", "weight": 0.333, "is_mandatory": False,
+            "category": "skills",
+            "name": "Python",
+            "requirement_type": "preferred",
+            "importance": "high",
+            "weight": 0.333,
+            "is_mandatory": False,
         },
         headers=admin_headers,
     )
@@ -224,7 +269,9 @@ async def test_requirement_weights_accept_decimals_and_mandatory_can_be_toggled(
     assert create.json()["data"]["weight"] == pytest.approx(0.333)
 
     mandatory = await client.put(
-        f"{requirements_url}/{requirement_id}", json={"is_mandatory": True}, headers=admin_headers
+        f"{requirements_url}/{requirement_id}",
+        json={"is_mandatory": True},
+        headers=admin_headers,
     )
     assert mandatory.status_code == 200
     assert mandatory.json()["data"]["requirement_type"] == "mandatory"
@@ -244,8 +291,12 @@ async def test_requirement_weights_accept_decimals_and_mandatory_can_be_toggled(
     second = await client.post(
         requirements_url,
         json={
-            "category": "skills", "name": "PostgreSQL", "requirement_type": "preferred",
-            "importance": "medium", "weight": 0.667, "is_mandatory": False,
+            "category": "skills",
+            "name": "PostgreSQL",
+            "requirement_type": "preferred",
+            "importance": "medium",
+            "weight": 0.667,
+            "is_mandatory": False,
         },
         headers=admin_headers,
     )
@@ -255,20 +306,36 @@ async def test_requirement_weights_accept_decimals_and_mandatory_can_be_toggled(
 
 
 @pytest.mark.asyncio
-async def test_requirement_validation_separates_mandatory_from_scoring(client, company_with_admin, admin_headers):
-    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()["data"]["id"]
+async def test_requirement_validation_separates_mandatory_from_scoring(
+        client, company_with_admin, admin_headers
+):
+    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()[
+        "data"
+    ]["id"]
     invalid = {
-        "category": "skills", "name": "Python", "requirement_type": "mandatory",
-        "importance": "high", "weight": 50, "is_mandatory": True,
-    }
-    response = await client.post(f"/api/v1/jobs/{job_id}/requirements", json=invalid, headers=admin_headers)
-    assert response.status_code == 422
-    invalid_weight = {
-        "category": "skills", "name": "Python", "requirement_type": "preferred",
-        "importance": "high", "weight": 1.01, "is_mandatory": False,
+        "category": "skills",
+        "name": "Python",
+        "requirement_type": "mandatory",
+        "importance": "high",
+        "weight": 50,
+        "is_mandatory": True,
     }
     response = await client.post(
-        f"/api/v1/jobs/{job_id}/requirements", json=invalid_weight, headers=admin_headers
+        f"/api/v1/jobs/{job_id}/requirements", json=invalid, headers=admin_headers
+    )
+    assert response.status_code == 422
+    invalid_weight = {
+        "category": "skills",
+        "name": "Python",
+        "requirement_type": "preferred",
+        "importance": "high",
+        "weight": 1.01,
+        "is_mandatory": False,
+    }
+    response = await client.post(
+        f"/api/v1/jobs/{job_id}/requirements",
+        json=invalid_weight,
+        headers=admin_headers,
     )
     assert response.status_code == 422
 
@@ -280,31 +347,51 @@ async def test_extraction_returns_valid_suggestions_without_overwriting_job(
     class MockProvider:
         async def extract_requirements(self, description):
             assert description == JOB_PAYLOAD["description"]
-            return {"suggestions": [
-                {"category": "skills", "name": "Python", "requirement_type": "preferred",
-                 "importance": "high", "weight": 1.0, "is_mandatory": False},
-            ]}
+            return {
+                "suggestions": [
+                    {
+                        "category": "skills",
+                        "name": "Python",
+                        "requirement_type": "preferred",
+                        "importance": "high",
+                        "weight": 1.0,
+                        "is_mandatory": False,
+                    },
+                ]
+            }
 
     app = client._transport.app
     app.dependency_overrides[get_requirement_extraction_provider] = lambda: MockProvider()
     job = await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)
     job_id = job.json()["data"]["id"]
-    response = await client.post(f"/api/v1/jobs/{job_id}/extract-requirements", json={}, headers=admin_headers)
+    response = await client.post(
+        f"/api/v1/jobs/{job_id}/extract-requirements", json={}, headers=admin_headers
+    )
     assert response.status_code == 200
     assert response.json()["data"]["suggestions"][0]["name"] == "Python"
-    stored = (await client.get(f"/api/v1/jobs/{job_id}/requirements", headers=admin_headers)).json()["data"]
+    stored = (
+        await client.get(f"/api/v1/jobs/{job_id}/requirements", headers=admin_headers)
+    ).json()["data"]
     assert stored == []
-    assert (await client.get(f"/api/v1/jobs/{job_id}", headers=admin_headers)).json()["data"]["status"] == "draft"
+    assert (await client.get(f"/api/v1/jobs/{job_id}", headers=admin_headers)).json()["data"][
+               "status"
+           ] == "draft"
 
 
 @pytest.mark.asyncio
-async def test_extraction_rejects_invalid_provider_output(client, company_with_admin, admin_headers):
+async def test_extraction_rejects_invalid_provider_output(
+        client, company_with_admin, admin_headers
+):
     class MockProvider:
         async def extract_requirements(self, description):
             return {"suggestions": [{"category": "bogus", "name": "Invalid"}]}
 
     app = client._transport.app
     app.dependency_overrides[get_requirement_extraction_provider] = lambda: MockProvider()
-    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()["data"]["id"]
-    response = await client.post(f"/api/v1/jobs/{job_id}/extract-requirements", json={}, headers=admin_headers)
+    job_id = (await client.post("/api/v1/jobs", json=JOB_PAYLOAD, headers=admin_headers)).json()[
+        "data"
+    ]["id"]
+    response = await client.post(
+        f"/api/v1/jobs/{job_id}/extract-requirements", json={}, headers=admin_headers
+    )
     assert response.status_code == 502

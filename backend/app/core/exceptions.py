@@ -1,16 +1,21 @@
 import logging
+import traceback
 from typing import Any, Optional
+
+from app.core.config import settings
+from app.core.observability import build_error_reporter
+from app.utils.responses import error_response
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.utils.responses import error_response
-
 logger = logging.getLogger("job_sentry")
+error_reporter = build_error_reporter(settings.SENTRY_DSN)
 
 
 class AppException(Exception):
     """Base application exception."""
+
     def __init__(
         self,
         message: str = "An error occurred",
@@ -29,12 +34,20 @@ class BadRequestException(AppException):
 
 
 class UnauthorizedException(AppException):
-    def __init__(self, message: str = "Could not validate credentials", errors: Optional[Any] = None):
+    def __init__(
+            self,
+            message: str = "Could not validate credentials",
+            errors: Optional[Any] = None,
+    ):
         super().__init__(message=message, status_code=401, errors=errors)
 
 
 class ForbiddenException(AppException):
-    def __init__(self, message: str = "You do not have permission to access this resource", errors: Optional[Any] = None):
+    def __init__(
+            self,
+            message: str = "You do not have permission to access this resource",
+            errors: Optional[Any] = None,
+    ):
         super().__init__(message=message, status_code=403, errors=errors)
 
 
@@ -75,11 +88,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     formatted_errors = []
     for err in exc.errors():
         loc = " -> ".join([str(p) for p in err.get("loc", []) if p != "body"])
-        formatted_errors.append({
-            "field": loc if loc else "body",
-            "message": err.get("msg", "Invalid value"),
-            "type": err.get("type"),
-        })
+        formatted_errors.append(
+            {
+                "field": loc if loc else "body",
+                "message": err.get("msg", "Invalid value"),
+                "type": err.get("type"),
+            }
+        )
     return error_response(
         message="Request validation error",
         status_code=422,
@@ -89,7 +104,20 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Handle all uncaught exceptions, preventing stack trace leakage."""
-    logger.exception(f"Unhandled error handling request {request.method} {request.url.path}: {exc}")
+    request_id = getattr(request.state, "request_id", None)
+    frames = [
+        {"file": frame.filename, "line": frame.lineno, "function": frame.name}
+        for frame in traceback.extract_tb(exc.__traceback__)
+    ]
+    logger.error(
+        "Unhandled request exception",
+        extra={
+            "request_id": request_id,
+            "exception_type": type(exc).__name__,
+            "traceback_frames": frames,
+        },
+    )
+    error_reporter.report_exception(exc, request_id=request_id)
     return error_response(
         message="An unexpected internal server error occurred. Please try again later.",
         status_code=500,

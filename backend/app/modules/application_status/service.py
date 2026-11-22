@@ -3,13 +3,12 @@ from __future__ import annotations
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.ai_features.models.application import Application
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.models.user import User, UserRole
 from app.modules.application_status.models import ApplicationStatusHistory
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class ApplicationStatus(StrEnum):
@@ -24,13 +23,19 @@ class ApplicationStatus(StrEnum):
 TRANSITIONS: dict[ApplicationStatus, set[ApplicationStatus]] = {
     ApplicationStatus.APPLIED: {ApplicationStatus.PROCESSING, ApplicationStatus.WITHDRAWN},
     ApplicationStatus.PROCESSING: {
-        ApplicationStatus.ANALYZED, ApplicationStatus.APPLIED, ApplicationStatus.WITHDRAWN
+        ApplicationStatus.ANALYZED,
+        ApplicationStatus.APPLIED,
+        ApplicationStatus.WITHDRAWN,
     },
     ApplicationStatus.ANALYZED: {
-        ApplicationStatus.SHORTLISTED, ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN
+        ApplicationStatus.SHORTLISTED,
+        ApplicationStatus.REJECTED,
+        ApplicationStatus.WITHDRAWN,
     },
     ApplicationStatus.SHORTLISTED: {
-        ApplicationStatus.ANALYZED, ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN
+        ApplicationStatus.ANALYZED,
+        ApplicationStatus.REJECTED,
+        ApplicationStatus.WITHDRAWN,
     },
     ApplicationStatus.REJECTED: {ApplicationStatus.ANALYZED, ApplicationStatus.WITHDRAWN},
     ApplicationStatus.WITHDRAWN: set(),
@@ -42,7 +47,11 @@ USER_STATUSES = {
     ApplicationStatus.WITHDRAWN,
     ApplicationStatus.ANALYZED,
 }
-SYSTEM_STATUSES = {ApplicationStatus.PROCESSING, ApplicationStatus.ANALYZED, ApplicationStatus.APPLIED}
+SYSTEM_STATUSES = {
+    ApplicationStatus.PROCESSING,
+    ApplicationStatus.ANALYZED,
+    ApplicationStatus.APPLIED,
+}
 
 
 class ApplicationStatusService:
@@ -84,16 +93,16 @@ class ApplicationStatusService:
 
         application = (
             await db.execute(
-                select(Application)
-                .where(Application.id == application_id)
-                .with_for_update()
+                select(Application).where(Application.id == application_id).with_for_update()
             )
         ).scalar_one_or_none()
         if application is None:
             raise NotFoundException("Application not found")
         current = ApplicationStatus(application.status)
         if target == current or target not in TRANSITIONS[current]:
-            raise ConflictException(f"Cannot change application status from {current.value} to {target.value}")
+            raise ConflictException(
+                f"Cannot change application status from {current.value} to {target.value}"
+            )
 
         application.status = target.value
         history = ApplicationStatusHistory(

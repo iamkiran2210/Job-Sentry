@@ -1,9 +1,9 @@
 from datetime import timedelta
 from unittest.mock import patch
-import pytest
-from httpx import AsyncClient
 
+import pytest
 from app.core.security import create_access_token, hash_password
+from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
@@ -37,9 +37,7 @@ async def test_registration_requires_company_admin(client: AsyncClient, auth_hea
         "password": "StrongPassword123!",
     }
     anonymous = await client.post("/api/v1/auth/register", json=payload)
-    recruiter = await client.post(
-        "/api/v1/auth/register", json=payload, headers=auth_headers
-    )
+    recruiter = await client.post("/api/v1/auth/register", json=payload, headers=auth_headers)
     assert anonymous.status_code == 401
     assert recruiter.status_code in {403, 404}
 
@@ -182,7 +180,9 @@ async def test_expired_access_token(client: AsyncClient, registered_user):
 @pytest.mark.asyncio
 async def test_invalid_refresh_token(client: AsyncClient):
     """Test refresh endpoint with completely invalid token."""
-    response = await client.post("/api/v1/auth/refresh", json={"refresh_token": "invalid.jwt.token"})
+    response = await client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": "invalid.jwt.token"}
+    )
     assert response.status_code == 401
     data = response.json()
     assert data["success"] is False
@@ -284,9 +284,7 @@ async def test_logout_cannot_revoke_another_users_refresh_token(
         json={"refresh_token": other_refresh},
         headers=auth_headers,
     )
-    refresh = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": other_refresh}
-    )
+    refresh = await client.post("/api/v1/auth/refresh", json={"refresh_token": other_refresh})
     assert refresh.status_code == 200
 
 

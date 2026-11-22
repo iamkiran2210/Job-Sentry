@@ -3,9 +3,9 @@
 Revision ID: f4a1b2c3d5e6
 Revises: e82c4a91d307
 """
-from alembic import op
-import sqlalchemy as sa
 
+import sqlalchemy as sa
+from alembic import op
 
 revision = "f4a1b2c3d5e6"
 down_revision = "e82c4a91d307"
@@ -54,5 +54,12 @@ def downgrade() -> None:
         "ck_score_evidence_category_valid",
     ):
         op.drop_constraint(name, "score_evidence", type_="check")
-    for name in ("source_end", "source_start", "prompt_version", "llm_model", "embedding_dim", "embedding_model"):
+    for name in (
+            "source_end",
+            "source_start",
+            "prompt_version",
+            "llm_model",
+            "embedding_dim",
+            "embedding_model",
+    ):
         op.drop_column("score_evidence", name)

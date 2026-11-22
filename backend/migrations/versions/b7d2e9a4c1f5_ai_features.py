@@ -46,15 +46,9 @@ def upgrade() -> None:
         sa.Column("normalized_email", sa.String(320)),
         sa.Column("normalized_phone", sa.String(20)),
     )
-    op.create_index(
-        "ix_candidates_company_email", "candidates", ["company_id", "normalized_email"]
-    )
-    op.create_index(
-        "ix_candidates_company_phone", "candidates", ["company_id", "normalized_phone"]
-    )
-    op.create_index(
-        "ix_candidates_company_name", "candidates", ["company_id", "normalized_name"]
-    )
+    op.create_index("ix_candidates_company_email", "candidates", ["company_id", "normalized_email"])
+    op.create_index("ix_candidates_company_phone", "candidates", ["company_id", "normalized_phone"])
+    op.create_index("ix_candidates_company_name", "candidates", ["company_id", "normalized_name"])
 
     op.create_table(
         "applications",
@@ -63,9 +57,7 @@ def upgrade() -> None:
         _fk("job_id", "jobs.id"),
         _fk("candidate_id", "candidates.id", nullable=True, ondelete="SET NULL"),
         sa.Column("status", sa.String(20), nullable=False),
-        sa.UniqueConstraint(
-            "candidate_id", "job_id", name="uq_applications_candidate_job"
-        ),
+        sa.UniqueConstraint("candidate_id", "job_id", name="uq_applications_candidate_job"),
     )
 
     op.create_table(
@@ -93,9 +85,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
         sa.Column("duplicate_of_resume_id", sa.Uuid),
-        sa.UniqueConstraint(
-            "company_id", "job_id", "sha256", name="uq_resumes_company_job_sha256"
-        ),
+        sa.UniqueConstraint("company_id", "job_id", "sha256", name="uq_resumes_company_job_sha256"),
         sa.CheckConstraint(
             "status in ('uploaded','queued','extracting','analyzing','completed','failed')",
             name="ck_resumes_status",
@@ -139,12 +129,8 @@ def upgrade() -> None:
         sa.Column("strength", sa.String(10), nullable=False),
         sa.Column("reasons", JSON, nullable=False),
         sa.Column("status", sa.String(12), nullable=False),
-        sa.UniqueConstraint(
-            "candidate_id", "other_candidate_id", name="uq_identity_pair"
-        ),
-        sa.CheckConstraint(
-            "candidate_id <> other_candidate_id", name="ck_identity_distinct"
-        ),
+        sa.UniqueConstraint("candidate_id", "other_candidate_id", name="uq_identity_pair"),
+        sa.CheckConstraint("candidate_id <> other_candidate_id", name="ck_identity_distinct"),
     )
 
 

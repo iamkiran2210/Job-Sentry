@@ -1,7 +1,7 @@
 """Real PostgreSQL migration, legacy-data, downgrade, and schema round-trip test."""
+
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
@@ -13,7 +13,6 @@ from uuid import UUID, uuid4
 import asyncpg
 import pytest
 from sqlalchemy.engine import URL, make_url
-
 
 pytestmark = pytest.mark.integration
 
@@ -59,7 +58,9 @@ def _run_alembic(database_url: str, *args: str) -> str:
         "ALEMBIC_DATABASE_URL": database_url,
     }
     command = [str(MIGRATION_SCRIPT), *args]
-    result = subprocess.run(command, cwd=BACKEND_ROOT, env=env, text=True, capture_output=True, timeout=60)
+    result = subprocess.run(
+        command, cwd=BACKEND_ROOT, env=env, text=True, capture_output=True, timeout=60
+    )
     output = result.stdout + result.stderr
     assert result.returncode == 0, _safe_output(output, database_url)
     return output
@@ -98,7 +99,9 @@ async def _snapshot_schema(conn: asyncpg.Connection) -> dict:
         "WHERE n.nspname = 'job_sentry' AND NOT t.tgisinternal "
         "ORDER BY table_name, t.tgname"
     )
-    extension = await conn.fetchval("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+    extension = await conn.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+    )
     return {
         "tables": [tuple(row) for row in tables],
         "columns": [tuple(row) for row in columns],
@@ -115,30 +118,53 @@ async def _seed_phase1_to_3_rows(conn: asyncpg.Connection) -> dict[str, str]:
     company_id, user_id, job_id, candidate_id, application_id = (uuid4() for _ in range(5))
     await conn.execute(
         "INSERT INTO job_sentry.companies (id, name, created_at, updated_at) VALUES ($1, $2, $3, $3)",
-        company_id, "Migration Fixture Co", now,
+        company_id,
+        "Migration Fixture Co",
+        now,
     )
     await conn.execute(
         "INSERT INTO job_sentry.users (id, name, email, role, company_id, auth_provider, is_active, is_verified, created_at, updated_at) "
         "VALUES ($1, $2, $3, 'ADMIN', $4, 'EMAIL', true, true, $5, $5)",
-        user_id, "Migration Fixture Admin", f"migration-{user_id}@example.test", company_id, now,
+        user_id,
+        "Migration Fixture Admin",
+        f"migration-{user_id}@example.test",
+        company_id,
+        now,
     )
     await conn.execute(
         "INSERT INTO job_sentry.jobs (id, company_id, title, description, employment_type, work_mode, openings, status, created_at, updated_at) "
         "VALUES ($1, $2, $3, $4, 'full_time', 'remote', 1, 'draft', $5, $5)",
-        job_id, company_id, "Migration Fixture Role", "Phase 1-3 row preservation", now,
+        job_id,
+        company_id,
+        "Migration Fixture Role",
+        "Phase 1-3 row preservation",
+        now,
     )
     await conn.execute(
         "INSERT INTO job_sentry.candidates (id, company_id, full_name, email, normalized_email, created_at, updated_at) "
         "VALUES ($1, $2, $3, $4, $4, $5, $5)",
-        candidate_id, company_id, "Legacy Candidate", f"candidate-{candidate_id}@example.test", now,
+        candidate_id,
+        company_id,
+        "Legacy Candidate",
+        f"candidate-{candidate_id}@example.test",
+        now,
     )
     await conn.execute(
         "INSERT INTO job_sentry.applications (id, company_id, job_id, candidate_id, status, created_at, updated_at) "
         "VALUES ($1, $2, $3, $4, 'completed', $5, $5)",
-        application_id, company_id, job_id, candidate_id, now,
+        application_id,
+        company_id,
+        job_id,
+        candidate_id,
+        now,
     )
-    return {"company_id": str(company_id), "user_id": str(user_id), "job_id": str(job_id),
-            "candidate_id": str(candidate_id), "application_id": str(application_id)}
+    return {
+        "company_id": str(company_id),
+        "user_id": str(user_id),
+        "job_id": str(job_id),
+        "candidate_id": str(candidate_id),
+        "application_id": str(application_id),
+    }
 
 
 @pytest.mark.asyncio
@@ -173,8 +199,10 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
             "INSERT INTO job_sentry.applications "
             "(id, company_id, job_id, candidate_id, status, created_at, updated_at) "
             "VALUES ($1, $2, $3, NULL, 'unknown_legacy', $4, $4)",
-                unknown_application_id, UUID(legacy["company_id"]),
-                UUID(legacy["job_id"]), datetime.now(timezone.utc),
+            unknown_application_id,
+            UUID(legacy["company_id"]),
+            UUID(legacy["job_id"]),
+            datetime.now(timezone.utc),
         )
         legacy["unknown_application_id"] = str(unknown_application_id)
         await roundtrip_conn.close()
@@ -190,45 +218,120 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
             "INSERT INTO job_sentry.candidate_scores "
             "(id, company_id, application_id, scoring_version, algorithm_version, category_detail, eligibility, review_signals, config_snapshot, created_at, updated_at) "
             "VALUES ($1, $2, $3, 'legacy-v1', 'legacy-v1', '{}'::jsonb, 'needs_review', '[]'::jsonb, '{}'::jsonb, $4, $4)",
-            score_id, legacy["company_id"], legacy["application_id"], now,
+            score_id,
+            legacy["company_id"],
+            legacy["application_id"],
+            now,
         )
         await roundtrip_conn.execute(
             "INSERT INTO job_sentry.verification_results "
             "(id, company_id, application_id, check_type, status, signal, details, created_at, updated_at) "
             "VALUES ($1, $2, $3, 'email_syntax', 'passed', 'legacy row', '{}'::jsonb, $4, $4)",
-            verification_id, legacy["company_id"], legacy["application_id"], now,
+            verification_id,
+            legacy["company_id"],
+            legacy["application_id"],
+            now,
         )
         await roundtrip_conn.execute(
             "INSERT INTO job_sentry.score_evidence "
             "(id, company_id, score_id, application_id, evidence_id, category, signal_type, value, evidence_data, created_at, updated_at) "
             "VALUES ($1, $2, $3, $4, 'legacy-evidence', 'skills', 'exact_skill_match', 1, '{}'::jsonb, $5, $5)",
-            evidence_id, legacy["company_id"], score_id, legacy["application_id"], now,
+            evidence_id,
+            legacy["company_id"],
+            score_id,
+            legacy["application_id"],
+            now,
         )
         await roundtrip_conn.execute(
             "INSERT INTO job_sentry.ranking_history "
             "(id, company_id, job_id, requirements_snapshot, requirements_hash, ranked_items, filters_used, scoring_version, algorithm_version, config_snapshot, triggered_by, created_at, updated_at) "
             "VALUES ($1, $2, $3, '[]'::jsonb, $4, '[]'::jsonb, '{}'::jsonb, 'legacy-v1', 'legacy-v1', '{}'::jsonb, $5, $6, $6)",
-            history_id, legacy["company_id"], legacy["job_id"], "0" * 64, legacy["user_id"], now,
+            history_id,
+            legacy["company_id"],
+            legacy["job_id"],
+            "0" * 64,
+            legacy["user_id"],
+            now,
         )
         await roundtrip_conn.close()
         roundtrip_conn = None
 
         _run_alembic(roundtrip_url, "upgrade", "head")
         roundtrip_conn = await asyncpg.connect(**_connection_args(base, ROUNDTRIP_DATABASE))
-        assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.companies WHERE id = $1", legacy["company_id"]) == 1
-        assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.jobs WHERE id = $1", legacy["job_id"]) == 1
-        assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.candidates WHERE id = $1", legacy["candidate_id"]) == 1
-        assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == 1
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "analyzed"
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "applied"
-        assert await roundtrip_conn.fetchval("SELECT job_id FROM job_sentry.candidate_scores WHERE id = $1", score_id) == __import__("uuid").UUID(legacy["job_id"])
-        assert json.loads(await roundtrip_conn.fetchval(
-            "SELECT mandatory_results FROM job_sentry.candidate_scores WHERE id = $1", score_id
-        )) == []
-        assert await roundtrip_conn.fetchval("SELECT checker_version FROM job_sentry.verification_results WHERE id = $1", verification_id) == "v1"
-        assert await roundtrip_conn.fetchval("SELECT is_proof FROM job_sentry.score_evidence WHERE id = $1", evidence_id) is False
-        assert await roundtrip_conn.fetchval("SELECT run_id FROM job_sentry.ranking_history WHERE id = $1", history_id) == history_id
-        assert await roundtrip_conn.fetchval("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')") is True
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT count(*) FROM job_sentry.companies WHERE id = $1", legacy["company_id"]
+                )
+                == 1
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT count(*) FROM job_sentry.jobs WHERE id = $1", legacy["job_id"]
+                )
+                == 1
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT count(*) FROM job_sentry.candidates WHERE id = $1", legacy["candidate_id"]
+                )
+                == 1
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT count(*) FROM job_sentry.applications WHERE id = $1",
+                    legacy["application_id"],
+                )
+                == 1
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]
+                )
+                == "analyzed"
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id
+                )
+                == "applied"
+        )
+        assert await roundtrip_conn.fetchval(
+            "SELECT job_id FROM job_sentry.candidate_scores WHERE id = $1", score_id
+        ) == __import__("uuid").UUID(legacy["job_id"])
+        assert (
+                json.loads(
+                    await roundtrip_conn.fetchval(
+                        "SELECT mandatory_results FROM job_sentry.candidate_scores WHERE id = $1",
+                        score_id,
+                    )
+                )
+                == []
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT checker_version FROM job_sentry.verification_results WHERE id = $1",
+                    verification_id,
+                )
+                == "v1"
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT is_proof FROM job_sentry.score_evidence WHERE id = $1", evidence_id
+                )
+                is False
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT run_id FROM job_sentry.ranking_history WHERE id = $1", history_id
+                )
+                == history_id
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+                )
+                is True
+        )
         schema_before = await _snapshot_schema(roundtrip_conn)
         await roundtrip_conn.close()
         roundtrip_conn = None
@@ -237,9 +340,24 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         assert "No new upgrade operations detected." in drift
         _run_alembic(roundtrip_url, "downgrade", PHASE4_PRE_TYPED_REVISION)
         roundtrip_conn = await asyncpg.connect(**_connection_args(base, ROUNDTRIP_DATABASE))
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "completed"
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "unknown_legacy"
-        assert await roundtrip_conn.fetchval("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')") is True
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]
+                )
+                == "completed"
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id
+                )
+                == "unknown_legacy"
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+                )
+                is True
+        )
         await roundtrip_conn.close()
         roundtrip_conn = None
         _run_alembic(roundtrip_url, "upgrade", "head")
@@ -248,9 +366,25 @@ async def test_postgres_migration_roundtrip_and_phase1_to_3_data_survival():
         schema_after = await _snapshot_schema(roundtrip_conn)
         assert schema_after == schema_before
         assert schema_after["vector_extension"] is True
-        assert await roundtrip_conn.fetchval("SELECT count(*) FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == 1
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]) == "analyzed"
-        assert await roundtrip_conn.fetchval("SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id) == "applied"
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT count(*) FROM job_sentry.applications WHERE id = $1",
+                    legacy["application_id"],
+                )
+                == 1
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", legacy["application_id"]
+                )
+                == "analyzed"
+        )
+        assert (
+                await roundtrip_conn.fetchval(
+                    "SELECT status FROM job_sentry.applications WHERE id = $1", unknown_application_id
+                )
+                == "applied"
+        )
     finally:
         if roundtrip_conn is not None and not roundtrip_conn.is_closed():
             await roundtrip_conn.close()

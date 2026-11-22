@@ -17,5 +17,9 @@ def get_requirement_extraction_provider() -> RequirementExtractionProvider | Non
         module_path, factory_name = settings.AI_REQUIREMENTS_PROVIDER.split(":", 1)
         factory = getattr(import_module(module_path), factory_name)
         return factory()
+
     except (ImportError, AttributeError, ValueError) as exc:
-        raise AppException("Configured requirement extraction provider could not be loaded", status_code=503) from exc
+        raise AppException(
+            "Configured requirement extraction provider could not be loaded",
+            status_code=503,
+        ) from exc

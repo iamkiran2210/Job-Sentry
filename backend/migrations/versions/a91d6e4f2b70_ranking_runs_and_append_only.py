@@ -3,9 +3,9 @@
 Revision ID: a91d6e4f2b70
 Revises: f4a1b2c3d5e6
 """
-from alembic import op
-import sqlalchemy as sa
 
+import sqlalchemy as sa
+from alembic import op
 
 revision = "a91d6e4f2b70"
 down_revision = "f4a1b2c3d5e6"
@@ -56,7 +56,8 @@ def upgrade() -> None:
     # Backfill historical provenance from snapshots, preserving existing rows.
     # The immutable predecessor trigger forbids these one-time additive updates.
     op.execute("DROP TRIGGER IF EXISTS trg_ranking_history_immutable ON ranking_history")
-    op.execute(sa.text("""
+    op.execute(
+        sa.text("""
         UPDATE ranking_history rh SET
           embedding_model = COALESCE(provider_snapshot->>'embedding_model', 'unknown'),
           embedding_model_version = COALESCE(provider_snapshot->>'embedding_version', 'unknown'),
@@ -68,11 +69,16 @@ def upgrade() -> None:
                                   WHERE item->>'application_id' = rh.application_id::text LIMIT 1), 'needs_review'),
           verification_status = COALESCE((SELECT item->'verification_statuses'->>0 FROM jsonb_array_elements(ranked_items::jsonb) item
                                          WHERE item->>'application_id' = rh.application_id::text LIMIT 1), 'not_verified')
-    """))
+    """)
+    )
     for name, type_ in additions:
         op.alter_column("ranking_history", name, existing_type=type_, nullable=False)
 
-    op.create_index("ix_ranking_history_job_created_desc", "ranking_history", ["job_id", sa.text("created_at DESC")])
+    op.create_index(
+        "ix_ranking_history_job_created_desc",
+        "ranking_history",
+        ["job_id", sa.text("created_at DESC")],
+    )
 
     op.execute("""
         CREATE FUNCTION reject_ranking_history_mutation() RETURNS trigger AS $$
@@ -111,7 +117,16 @@ def downgrade() -> None:
         FOR EACH ROW EXECUTE FUNCTION prevent_ranking_history_update()
     """)
     op.drop_index("ix_ranking_history_job_created_desc", table_name="ranking_history")
-    for name in ("verification_status", "eligibility", "scoring_config_hash", "job_requirements_hash", "prompt_version", "llm_model", "embedding_model_version", "embedding_model"):
+    for name in (
+            "verification_status",
+            "eligibility",
+            "scoring_config_hash",
+            "job_requirements_hash",
+            "prompt_version",
+            "llm_model",
+            "embedding_model_version",
+            "embedding_model",
+    ):
         op.drop_column("ranking_history", name)
     op.drop_index("ix_ranking_run_job_id", table_name="ranking_run")
     op.drop_table("ranking_run")

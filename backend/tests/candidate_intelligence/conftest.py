@@ -1,4 +1,5 @@
 """Alembic-backed PostgreSQL fixtures for schema-sensitive Phase 4 tests."""
+
 from __future__ import annotations
 
 import os
@@ -10,7 +11,6 @@ import pytest_asyncio
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
-
 
 ALEMBIC_DATABASE = "job_sentry_phase4_alembic_test"
 BACKEND_ROOT = Path(__file__).resolve().parents[2]

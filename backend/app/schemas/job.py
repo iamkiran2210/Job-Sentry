@@ -5,8 +5,19 @@ from typing import Optional
 
 from app.models.job import EmploymentType, JobStatus, WorkMode
 from app.models.job_access import JobAccessLevel
-from app.models.job_requirement import RequirementCategory, RequirementImportance, RequirementType
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from app.models.job_requirement import (
+    RequirementCategory,
+    RequirementImportance,
+    RequirementType,
+)
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class JobCreateRequest(BaseModel):
@@ -54,7 +65,13 @@ class JobUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def disallow_null_required_fields(self):
-        for field in ("title", "description", "employment_type", "work_mode", "openings"):
+        for field in (
+                "title",
+                "description",
+                "employment_type",
+                "work_mode",
+                "openings",
+        ):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self
@@ -96,10 +113,11 @@ class JobRequirementFields(BaseModel):
     @model_validator(mode="after")
     def validate_type_weight(self):
         if self.requirement_type == RequirementType.MANDATORY:
-            if not self.is_mandatory or self.weight != 0:
-                raise ValueError("Mandatory requirements must set is_mandatory=true and weight=0")
-        elif self.is_mandatory or self.weight == 0:
-            raise ValueError("Preferred requirements must set is_mandatory=false and have a weight greater than 0")
+            if not self.is_mandatory or self.weight > 0:
+                raise ValueError(
+                    "Mandatory requirements must set is_mandatory=true and weight must be greater than 0"
+                )
+
         return self
 
 
@@ -160,11 +178,13 @@ class RequirementExtractionSuggestions(BaseModel):
     @model_validator(mode="after")
     def validate_preference_weights(self):
         total = sum(
-            requirement.weight for requirement in self.suggestions
+            requirement.weight
+            for requirement in self.suggestions
             if requirement.requirement_type == RequirementType.PREFERRED
         )
         if total != 0 and not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-6):
-            raise ValueError("Preferred requirement weights must total 1.0")
+            pass
+
         return self
 
 

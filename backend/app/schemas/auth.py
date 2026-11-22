@@ -1,8 +1,23 @@
 import re
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from app.schemas.user import UserResponse
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+
+
+class UserGoogleRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Name must be at least 2 characters long")
+        if len(v) > 255:
+            raise ValueError("Name cannot exceed 255 characters")
+        return v
 
 
 class UserRegisterRequest(BaseModel):

@@ -3,18 +3,16 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from alembic import context
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.config import settings
 from app.core.database import Base
-import app.models  # Ensure all models are registered with Base.metadata
 import app.ai_features.models  # noqa: F401 - register Phase 3 tables
 import app.modules.candidate_intelligence.models  # noqa: F401 - register Phase 4 tables
 from scripts.alembic_guard import enforce_database_target, resolve_database_url
@@ -85,6 +83,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    if connection.dialect.name == "postgresql":
+        connection.execute(text("CREATE SCHEMA IF NOT EXISTS job_sentry"))
+        connection.execute(text("SET search_path TO job_sentry, public"))
+        connection.commit()
+
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

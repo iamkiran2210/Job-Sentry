@@ -10,12 +10,23 @@ env/
 venv/
 ENV/
 
+# Node / SvelteKit
+node_modules/
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
 # Environment files
 .env
+backend/.env
+frontend/.env
 !.env.example
+!backend/.env.example
+!frontend/.env.example
 
-# Pytest / coverage
+# Pytest / Ruff / Coverage
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
@@ -25,6 +36,8 @@ htmlcov/
 *.swp
 *.swo
 
-# Database & Alembic
+# Local Databases, Dumps & Storage
 *.db
 *.sqlite3
+*.dump
+backend/var/

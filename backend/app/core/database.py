@@ -1,12 +1,12 @@
 from typing import AsyncGenerator
+
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-
-from app.core.config import settings
 
 # Configure async engine
 engine_kwargs = {
@@ -15,18 +15,20 @@ engine_kwargs = {
 }
 
 if "postgresql" in settings.DATABASE_URL:
-    engine_kwargs.update({
-        "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20,
-        "connect_args": {
-            "server_settings": {"search_path": "job_sentry,public"}
-        },
-    })
+    engine_kwargs.update(
+        {
+            "pool_pre_ping": True,
+            "pool_size": 10,
+            "max_overflow": 20,
+            "connect_args": {"server_settings": {"search_path": "job_sentry,public"}},
+        }
+    )
 elif "sqlite" in settings.DATABASE_URL:
-    engine_kwargs.update({
-        "connect_args": {"check_same_thread": False},
-    })
+    engine_kwargs.update(
+        {
+            "connect_args": {"check_same_thread": False},
+        }
+    )
 
 engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
@@ -42,6 +44,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """Base declarative class for all SQLAlchemy models."""
+
     pass
 
 

@@ -1,7 +1,12 @@
 import math
 import uuid
 
-from app.core.exceptions import BadRequestException, ConflictException, ForbiddenException, NotFoundException
+from app.core.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 from app.models.job import Job, JobStatus
 from app.models.job_access import JobAccess, JobAccessLevel
 from app.models.job_requirement import JobRequirement, RequirementType
@@ -73,7 +78,12 @@ class JobsService:
         return job
 
     @staticmethod
-    async def update_job(db: AsyncSession, current_user: User, job_id: uuid.UUID, request: JobUpdateRequest) -> Job:
+    async def update_job(
+            db: AsyncSession,
+            current_user: User,
+            job_id: uuid.UUID,
+            request: JobUpdateRequest,
+    ) -> Job:
         job = await JobsService.get_job(db, current_user, job_id, require_edit=True)
         if job.status in (JobStatus.CLOSED, JobStatus.ARCHIVED):
             raise ConflictException("Closed or archived jobs cannot be edited")
@@ -88,8 +98,155 @@ class JobsService:
         job = await JobsService.get_job(db, current_user, job_id, require_edit=True)
         if job.status != JobStatus.DRAFT:
             raise ConflictException("Only draft jobs can be deleted")
-        await db.delete(job)
+        await JobsService._purge_jobs_internal(db, [job])
+
+    @staticmethod
+    async def purge_job(
+            db: AsyncSession, current_user: User, job_id: uuid.UUID
+    ) -> dict[str, int]:
+        """Clean-delete a single job (any status) along with all dependent records and resume files."""
+        job = await JobsService.get_job(db, current_user, job_id, require_edit=True)
+        return await JobsService._purge_jobs_internal(db, [job])
+
+    @staticmethod
+    async def _purge_jobs_internal(db: AsyncSession, jobs: list[Job]) -> dict[str, int]:
+        """Permanently remove the given jobs and all dependent applications, resumes, scores, and audit rows."""
+        import asyncio
+        import sqlalchemy as sa
+
+        from app.ai_features.models.application import Application
+        from app.ai_features.models.extracted_profile import ExtractedProfile
+        from app.ai_features.models.resume import Resume
+        from app.ai_features.resumes.storage import get_storage
+        from app.modules.application_status.models import ApplicationStatusHistory
+        from app.modules.candidate_intelligence.models import (
+            CandidateScore,
+            RankingHistory,
+            RankingRun,
+            ScoreEvidenceRecord,
+            ScoreExplanation,
+            VerificationResult,
+        )
+
+        job_ids = [j.id for j in jobs]
+        if not job_ids:
+            return {"jobs_deleted": 0, "applications_deleted": 0, "resumes_deleted": 0}
+
+        is_pg = db.bind is not None and db.bind.dialect.name == "postgresql"
+        if is_pg:
+            await db.execute(
+                sa.text("SELECT set_config('job_sentry.allow_candidate_purge', 'on', true)")
+            )
+
+        app_ids = list(
+            (
+                await db.execute(
+                    sa.select(Application.id).where(Application.job_id.in_(job_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        storage_keys: list[str] = []
+        resumes_deleted = 0
+
+        await db.execute(sa.delete(RankingHistory).where(RankingHistory.job_id.in_(job_ids)))
+        await db.execute(sa.delete(RankingRun).where(RankingRun.job_id.in_(job_ids)))
+        await db.execute(
+            sa.delete(ApplicationStatusHistory).where(
+                ApplicationStatusHistory.job_id.in_(job_ids)
+            )
+        )
+
+        if app_ids:
+            resumes = list(
+                (
+                    await db.execute(sa.select(Resume).where(Resume.application_id.in_(app_ids)))
+                )
+                .scalars()
+                .all()
+            )
+            resume_ids = [r.id for r in resumes]
+            storage_keys = [r.storage_key for r in resumes if r.storage_key]
+            resumes_deleted = len(resumes)
+
+            score_ids = list(
+                (
+                    await db.execute(
+                        sa.select(CandidateScore.id).where(
+                            CandidateScore.application_id.in_(app_ids)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if score_ids:
+                await db.execute(
+                    sa.delete(ScoreExplanation).where(
+                        ScoreExplanation.candidate_score_id.in_(score_ids)
+                    )
+                )
+                await db.execute(
+                    sa.delete(ScoreEvidenceRecord).where(
+                        ScoreEvidenceRecord.score_id.in_(score_ids)
+                    )
+                )
+            await db.execute(
+                sa.delete(ScoreEvidenceRecord).where(
+                    ScoreEvidenceRecord.application_id.in_(app_ids)
+                )
+            )
+            await db.execute(
+                sa.delete(CandidateScore).where(CandidateScore.application_id.in_(app_ids))
+            )
+            await db.execute(
+                sa.delete(VerificationResult).where(
+                    VerificationResult.application_id.in_(app_ids)
+                )
+            )
+            if resume_ids:
+                await db.execute(
+                    sa.delete(ExtractedProfile).where(
+                        ExtractedProfile.resume_id.in_(resume_ids)
+                    )
+                )
+            await db.execute(sa.delete(Resume).where(Resume.application_id.in_(app_ids)))
+            await db.execute(sa.delete(Application).where(Application.id.in_(app_ids)))
+
+        await db.execute(sa.delete(JobRequirement).where(JobRequirement.job_id.in_(job_ids)))
+        await db.execute(sa.delete(JobAccess).where(JobAccess.job_id.in_(job_ids)))
+        await db.execute(sa.delete(Job).where(Job.id.in_(job_ids)))
         await db.commit()
+
+        if storage_keys:
+            storage = get_storage()
+            for key in storage_keys:
+                try:
+                    await asyncio.to_thread(storage.delete, key)
+                except Exception:
+                    pass
+
+        return {
+            "jobs_deleted": len(job_ids),
+            "applications_deleted": len(app_ids),
+            "resumes_deleted": resumes_deleted,
+        }
+
+    @staticmethod
+    async def purge_all_jobs(db: AsyncSession, current_user: User) -> dict[str, int]:
+        """Data Explorer clean delete: permanently remove all jobs (and dependent records/files) for the company."""
+        if not current_user.company_id:
+            raise NotFoundException("User does not belong to any company")
+
+        jobs = list(
+            (
+                await db.execute(select(Job).where(Job.company_id == current_user.company_id))
+            )
+            .scalars()
+            .all()
+        )
+        return await JobsService._purge_jobs_internal(db, jobs)
 
     @staticmethod
     async def validate_weights(db: AsyncSession, job_id: uuid.UUID) -> None:
@@ -101,10 +258,14 @@ class JobsService:
         )
         weights = list(result.scalars().all())
         if weights and not math.isclose(sum(weights), 1.0, rel_tol=0.0, abs_tol=1e-6):
-            raise BadRequestException("Preferred requirement weights must total 1.0 before publishing")
+            raise BadRequestException(
+                "Preferred requirement weights must total 1.0 before publishing"
+            )
 
     @staticmethod
-    async def transition(db: AsyncSession, current_user: User, job_id: uuid.UUID, action: str) -> Job:
+    async def transition(
+            db: AsyncSession, current_user: User, job_id: uuid.UUID, action: str
+    ) -> Job:
         job = await JobsService.get_job(db, current_user, job_id, require_edit=True)
         transitions = {
             "publish": {JobStatus.DRAFT, JobStatus.PAUSED},
@@ -130,7 +291,9 @@ class JobsService:
     @staticmethod
     async def list_requirements(db: AsyncSession, job: Job) -> list[JobRequirement]:
         result = await db.execute(
-            select(JobRequirement).where(JobRequirement.job_id == job.id).order_by(JobRequirement.created_at)
+            select(JobRequirement)
+            .where(JobRequirement.job_id == job.id)
+            .order_by(JobRequirement.created_at)
         )
         return list(result.scalars().all())
 
@@ -145,7 +308,9 @@ class JobsService:
             raise ConflictException("Requirements on closed or archived jobs cannot be edited")
 
     @staticmethod
-    async def create_requirement(db: AsyncSession, job: Job, request: JobRequirementCreateRequest) -> JobRequirement:
+    async def create_requirement(
+            db: AsyncSession, job: Job, request: JobRequirementCreateRequest
+    ) -> JobRequirement:
         JobsService._ensure_requirements_editable(job)
         requirement = JobRequirement(job_id=job.id, **request.model_dump())
         db.add(requirement)
@@ -157,11 +322,16 @@ class JobsService:
 
     @staticmethod
     async def update_requirement(
-            db: AsyncSession, job: Job, requirement_id: uuid.UUID, request: JobRequirementUpdateRequest
+            db: AsyncSession,
+            job: Job,
+            requirement_id: uuid.UUID,
+            request: JobRequirementUpdateRequest,
     ) -> JobRequirement:
         JobsService._ensure_requirements_editable(job)
         result = await db.execute(
-            select(JobRequirement).where(JobRequirement.id == requirement_id, JobRequirement.job_id == job.id)
+            select(JobRequirement).where(
+                JobRequirement.id == requirement_id, JobRequirement.job_id == job.id
+            )
         )
         requirement = result.scalar_one_or_none()
         if requirement is None:
@@ -176,9 +346,17 @@ class JobsService:
         if updates.get("is_mandatory") is True and "weight" not in updates:
             updates["weight"] = 0.0
         updated = {
-            **{key: getattr(requirement, key) for key in (
-                "category", "name", "requirement_type", "importance", "weight", "is_mandatory"
-            )},
+            **{
+                key: getattr(requirement, key)
+                for key in (
+                    "category",
+                    "name",
+                    "requirement_type",
+                    "importance",
+                    "weight",
+                    "is_mandatory",
+                )
+            },
             **updates,
         }
         validated = JobRequirementFields.model_validate(updated)
@@ -193,7 +371,9 @@ class JobsService:
     async def delete_requirement(db: AsyncSession, job: Job, requirement_id: uuid.UUID) -> None:
         JobsService._ensure_requirements_editable(job)
         result = await db.execute(
-            select(JobRequirement).where(JobRequirement.id == requirement_id, JobRequirement.job_id == job.id)
+            select(JobRequirement).where(
+                JobRequirement.id == requirement_id, JobRequirement.job_id == job.id
+            )
         )
         requirement = result.scalar_one_or_none()
         if requirement is None:

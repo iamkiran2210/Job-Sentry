@@ -4,34 +4,44 @@ import asyncio
 import uuid
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, select, text
-from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import async_sessionmaker
-
 from app.ai_features.models.application import Application
 from app.ai_features.models.resume import Resume
+from app.ai_features.resumes.config import ResumeSettings
 from app.ai_features.resumes.errors import FailureCode
 from app.ai_features.resumes.pipeline import Claim, _claim, _fail, _finalize
-from app.ai_features.resumes.config import ResumeSettings
 from app.ai_features.schemas.resume_extraction import ExtractedProfileData
+from app.core.database import get_db
+from app.core.security import create_access_token
+from app.main import app as fastapi_app
 from app.models.company import Company
 from app.models.job import EmploymentType, Job, WorkMode
 from app.models.job_access import JobAccess, JobAccessLevel
 from app.models.user import User, UserRole
-from app.core.database import get_db
-from app.core.security import create_access_token
-from app.main import app as fastapi_app
 from app.modules.application_status.models import ApplicationStatusHistory
 from app.modules.application_status.service import ApplicationStatusService
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 
 async def seed_application(engine, status="applied", role=UserRole.RECRUITER):
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
         company = Company(name=f"status-{uuid.uuid4()}")
-        user = User(name="Status Recruiter", email=f"{uuid.uuid4()}@example.test", company=company, role=role)
-        job = Job(company=company, title="Backend", description="Backend role", employment_type=EmploymentType.FULL_TIME, work_mode=WorkMode.REMOTE)
+        user = User(
+            name="Status Recruiter",
+            email=f"{uuid.uuid4()}@example.test",
+            company=company,
+            role=role,
+        )
+        job = Job(
+            company=company,
+            title="Backend",
+            description="Backend role",
+            employment_type=EmploymentType.FULL_TIME,
+            work_mode=WorkMode.REMOTE,
+        )
         session.add_all([company, user, job])
         await session.flush()
         application = Application(company_id=company.id, job_id=job.id, status=status)
@@ -44,10 +54,17 @@ async def seed_resume(engine, application_id, job_id, company_id, status="upload
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
         resume = Resume(
-            company_id=company_id, job_id=job_id, application_id=application_id,
-            original_filename="candidate.pdf", extension="pdf", content_type="application/pdf",
-            size_bytes=100, sha256=uuid.uuid4().hex, storage_backend="local",
-            storage_key=uuid.uuid4().hex, status=status,
+            company_id=company_id,
+            job_id=job_id,
+            application_id=application_id,
+            original_filename="candidate.pdf",
+            extension="pdf",
+            content_type="application/pdf",
+            size_bytes=100,
+            sha256=uuid.uuid4().hex,
+            storage_backend="local",
+            storage_key=uuid.uuid4().hex,
+            status=status,
         )
         session.add(resume)
         await session.commit()
@@ -55,14 +72,19 @@ async def seed_resume(engine, application_id, job_id, company_id, status="upload
 
 
 ALLOWED = [
-    ("applied", "processing", "system"), ("applied", "withdrawn", "user"),
-    ("processing", "analyzed", "system"), ("processing", "applied", "system"),
+    ("applied", "processing", "system"),
+    ("applied", "withdrawn", "user"),
+    ("processing", "analyzed", "system"),
+    ("processing", "applied", "system"),
     ("processing", "withdrawn", "user"),
-    ("analyzed", "shortlisted", "user"), ("analyzed", "rejected", "user"),
+    ("analyzed", "shortlisted", "user"),
+    ("analyzed", "rejected", "user"),
     ("analyzed", "withdrawn", "user"),
-    ("shortlisted", "analyzed", "user"), ("shortlisted", "rejected", "user"),
+    ("shortlisted", "analyzed", "user"),
+    ("shortlisted", "rejected", "user"),
     ("shortlisted", "withdrawn", "user"),
-    ("rejected", "analyzed", "user"), ("rejected", "withdrawn", "user"),
+    ("rejected", "analyzed", "user"),
+    ("rejected", "withdrawn", "user"),
 ]
 
 
@@ -74,7 +96,10 @@ async def test_allowed_status_transitions_write_history(alembic_db, source, targ
     sessions = async_sessionmaker(alembic_db, expire_on_commit=False)
     async with sessions() as session:
         application, history = await ApplicationStatusService.transition(
-            session, application_id, target, actor_type=actor_type,
+            session,
+            application_id,
+            target,
+            actor_type=actor_type,
             actor_user_id=user_id if actor_type == "user" else None,
             reason="Human decision" if target == "rejected" else None,
         )
@@ -87,7 +112,9 @@ async def test_allowed_status_transitions_write_history(alembic_db, source, targ
 
 @pytest.mark.integration
 @pytest.mark.requires_pgvector
-@pytest.mark.parametrize("source", ["applied", "processing", "analyzed", "shortlisted", "rejected", "withdrawn"])
+@pytest.mark.parametrize(
+    "source", ["applied", "processing", "analyzed", "shortlisted", "rejected", "withdrawn"]
+)
 async def test_same_status_is_rejected(alembic_db, source):
     from app.core.exceptions import ConflictException
 
@@ -96,7 +123,11 @@ async def test_same_status_is_rejected(alembic_db, source):
     async with sessions() as session:
         with pytest.raises(ConflictException):
             await ApplicationStatusService.transition(
-                session, application_id, source, actor_type="user", actor_user_id=user_id,
+                session,
+                application_id,
+                source,
+                actor_type="user",
+                actor_user_id=user_id,
                 reason="Reason required to test this rejected status",
             )
 
@@ -110,13 +141,31 @@ async def test_rejection_requires_reason_and_system_cannot_reject(alembic_db):
     sessions = async_sessionmaker(alembic_db, expire_on_commit=False)
     async with sessions() as session:
         with pytest.raises(ValidationException):
-            await ApplicationStatusService.transition(session, application_id, "rejected", actor_type="user", actor_user_id=user_id)
+            await ApplicationStatusService.transition(
+                session, application_id, "rejected", actor_type="user", actor_user_id=user_id
+            )
         with pytest.raises(ConflictException):
-            await ApplicationStatusService.transition(session, application_id, "rejected", actor_type="system", reason="not allowed")
+            await ApplicationStatusService.transition(
+                session, application_id, "rejected", actor_type="system", reason="not allowed"
+            )
         with pytest.raises(ValidationException):
-            await ApplicationStatusService.transition(session, application_id, "rejected", actor_type="user", actor_user_id=user_id, reason=" " * 2)
+            await ApplicationStatusService.transition(
+                session,
+                application_id,
+                "rejected",
+                actor_type="user",
+                actor_user_id=user_id,
+                reason=" " * 2,
+            )
         with pytest.raises(ValidationException):
-            await ApplicationStatusService.transition(session, application_id, "rejected", actor_type="user", actor_user_id=user_id, reason="x" * 1001)
+            await ApplicationStatusService.transition(
+                session,
+                application_id,
+                "rejected",
+                actor_type="user",
+                actor_user_id=user_id,
+                reason="x" * 1001,
+            )
 
 
 @pytest.mark.integration
@@ -138,7 +187,10 @@ async def test_withdrawn_is_terminal_and_disallowed_edges_reject(alembic_db):
             async with sessions() as session:
                 with pytest.raises(ConflictException):
                     await ApplicationStatusService.transition(
-                        session, application_id, target, actor_type="user",
+                        session,
+                        application_id,
+                        target,
+                        actor_type="user",
                         actor_user_id=user_id,
                         reason="Reason required to test this rejected status",
                     )
@@ -150,11 +202,23 @@ async def test_status_change_rolls_back_with_history(alembic_db):
     application_id, _, _, user_id = await seed_application(alembic_db)
     sessions = async_sessionmaker(alembic_db, expire_on_commit=False)
     async with sessions() as session:
-        await ApplicationStatusService.transition(session, application_id, "withdrawn", actor_type="user", actor_user_id=user_id)
+        await ApplicationStatusService.transition(
+            session, application_id, "withdrawn", actor_type="user", actor_user_id=user_id
+        )
         await session.rollback()
     async with sessions() as session:
         application = await session.get(Application, application_id)
-        history = (await session.execute(select(ApplicationStatusHistory).where(ApplicationStatusHistory.application_id == application_id))).scalars().all()
+        history = (
+            (
+                await session.execute(
+                    select(ApplicationStatusHistory).where(
+                        ApplicationStatusHistory.application_id == application_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert application.status == "applied"
         assert history == []
 
@@ -166,7 +230,9 @@ async def test_status_history_is_append_only(alembic_db, operation):
     application_id, _, _, user_id = await seed_application(alembic_db)
     sessions = async_sessionmaker(alembic_db, expire_on_commit=False)
     async with sessions() as session:
-        _, history = await ApplicationStatusService.transition(session, application_id, "withdrawn", actor_type="user", actor_user_id=user_id)
+        _, history = await ApplicationStatusService.transition(
+            session, application_id, "withdrawn", actor_type="user", actor_user_id=user_id
+        )
         await session.commit()
         statement = (
             "UPDATE job_sentry.application_status_history SET reason = 'changed' WHERE id = :id"
@@ -231,13 +297,24 @@ async def test_status_patch_authorization_tenant_scope_and_history_page(alembic_
         async with sessions() as session:
             owner = await session.get(User, user_id)
             stranger_company = Company(name=f"other-{uuid.uuid4()}")
-            viewer = User(name="Viewer", email=f"{uuid.uuid4()}@example.test", company=stranger_company)
+            viewer = User(
+                name="Viewer", email=f"{uuid.uuid4()}@example.test", company=stranger_company
+            )
             session.add_all([stranger_company, viewer])
             await session.flush()
-            session.add(JobAccess(job_id=job_id, user_id=viewer.id, granted_by_id=user_id, access_level=JobAccessLevel.VIEWER))
+            session.add(
+                JobAccess(
+                    job_id=job_id,
+                    user_id=viewer.id,
+                    granted_by_id=user_id,
+                    access_level=JobAccessLevel.VIEWER,
+                )
+            )
             await session.commit()
             owner_token = create_access_token(str(user_id), owner.role.value, str(company_id))
-            viewer_token = create_access_token(str(viewer.id), viewer.role.value, str(stranger_company.id))
+            viewer_token = create_access_token(
+                str(viewer.id), viewer.role.value, str(stranger_company.id)
+            )
 
         transport = ASGITransport(app=fastapi_app)
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -288,10 +365,14 @@ async def test_status_patch_authorization_tenant_scope_and_history_page(alembic_
 
             async with sessions() as session:
                 outsider_company = Company(name=f"outsider-{uuid.uuid4()}")
-                outsider = User(name="Outsider", email=f"{uuid.uuid4()}@example.test", company=outsider_company)
+                outsider = User(
+                    name="Outsider", email=f"{uuid.uuid4()}@example.test", company=outsider_company
+                )
                 session.add_all([outsider_company, outsider])
                 await session.commit()
-                outsider_token = create_access_token(str(outsider.id), outsider.role.value, str(outsider_company.id))
+                outsider_token = create_access_token(
+                    str(outsider.id), outsider.role.value, str(outsider_company.id)
+                )
             isolated = await client.get(
                 f"/api/v1/applications/{application_id}/status-history",
                 headers={"Authorization": f"Bearer {outsider_token}"},
@@ -317,11 +398,17 @@ async def test_worker_records_processing_and_resets_to_applied_on_failure(alembi
 
     async with sessions() as session:
         application = await session.get(Application, application_id)
-        rows = (await session.execute(
-            select(ApplicationStatusHistory)
-            .where(ApplicationStatusHistory.application_id == application_id)
-            .order_by(ApplicationStatusHistory.created_at)
-        )).scalars().all()
+        rows = (
+            (
+                await session.execute(
+                    select(ApplicationStatusHistory)
+                    .where(ApplicationStatusHistory.application_id == application_id)
+                    .order_by(ApplicationStatusHistory.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert application.status == "applied"
         assert [(row.from_status, row.to_status, row.actor_type) for row in rows] == [
             ("applied", "processing", "system"),
@@ -335,9 +422,14 @@ async def test_worker_marks_application_analyzed_on_success(alembic_db):
     application_id, job_id, company_id, _ = await seed_application(alembic_db, "processing")
     resume_id = await seed_resume(alembic_db, application_id, job_id, company_id, "analyzing")
     claim = Claim(
-        resume_id=resume_id, company_id=company_id, job_id=job_id,
-        application_id=application_id, storage_key="key", sha256="a" * 64,
-        content_type="application/pdf", attempt=1,
+        resume_id=resume_id,
+        company_id=company_id,
+        job_id=job_id,
+        application_id=application_id,
+        storage_key="key",
+        sha256="a" * 64,
+        content_type="application/pdf",
+        attempt=1,
     )
     sessions = async_sessionmaker(alembic_db, expire_on_commit=False)
     async with sessions() as session:
@@ -345,11 +437,13 @@ async def test_worker_marks_application_analyzed_on_success(alembic_db):
         await session.commit()
     async with sessions() as session:
         application = await session.get(Application, application_id)
-        row = (await session.execute(
-            select(ApplicationStatusHistory).where(
-                ApplicationStatusHistory.application_id == application_id,
-                ApplicationStatusHistory.to_status == "analyzed",
+        row = (
+            await session.execute(
+                select(ApplicationStatusHistory).where(
+                    ApplicationStatusHistory.application_id == application_id,
+                    ApplicationStatusHistory.to_status == "analyzed",
+                )
             )
-        )).scalar_one()
+        ).scalar_one()
         assert application.status == "analyzed"
         assert row.actor_type == "system"

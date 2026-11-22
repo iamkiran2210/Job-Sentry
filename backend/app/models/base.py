@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from sqlalchemy import DateTime, Uuid
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 def utc_now() -> datetime:
@@ -16,6 +16,7 @@ class BaseModel(Base):
     Abstract base model providing UUID primary key and UTC timestamps.
     All application entity models inherit from this base.
     """
+
     __abstract__ = True
 
     id: Mapped[uuid.UUID] = mapped_column(

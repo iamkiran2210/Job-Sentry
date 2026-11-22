@@ -4,10 +4,14 @@ from uuid import UUID
 from uuid import uuid4
 
 import pytest
-
 from app.core.config import settings
+from app.core.observability import (
+    NoOpErrorReporter,
+    redact,
+    scrub_report_event,
+    write_worker_heartbeat,
+)
 from app.modules.health import router as health_module
-from app.core.observability import NoOpErrorReporter, redact, scrub_report_event, write_worker_heartbeat
 
 
 @pytest.mark.asyncio
@@ -22,8 +26,14 @@ async def test_request_id_is_echoed_logged_and_error_body_uses_same_id(client, c
     unauthorized = await client.get("/api/v1/jobs", headers={"X-Request-ID": request_id})
     assert unauthorized.status_code == 401
     assert unauthorized.json()["request_id"] == request_id
-    events = [json.loads(record.getMessage()) for record in caplog.records if record.name == "job_sentry.request"]
-    event = next(item for item in events if item["request_id"] == request_id and item["path"] == "/health")
+    events = [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == "job_sentry.request"
+    ]
+    event = next(
+        item for item in events if item["request_id"] == request_id and item["path"] == "/health"
+    )
     assert event["status"] == 200
     assert "authorization" not in event and "duration_ms" in event
 
@@ -31,8 +41,16 @@ async def test_request_id_is_echoed_logged_and_error_body_uses_same_id(client, c
 def test_redaction_masks_nested_secrets_and_pii():
     result = redact({"nested": {"email": "person@example.test", "api_key": "secret"}, "safe": "ok"})
     assert result == {"nested": {"email": "[REDACTED]", "api_key": "[REDACTED]"}, "safe": "ok"}
-    event = scrub_report_event({"message": "private exception", "exception": {"type": "ValueError", "value": "resume content"}})
-    assert event == {"message": "[REDACTED]", "exception": {"type": "ValueError", "value": "[REDACTED]"}}
+    event = scrub_report_event(
+        {
+            "message": "private exception",
+            "exception": {"type": "ValueError", "value": "resume content"},
+        }
+    )
+    assert event == {
+        "message": "[REDACTED]",
+        "exception": {"type": "ValueError", "value": "[REDACTED]"},
+    }
     assert NoOpErrorReporter().report_exception(ValueError("private"), request_id="request") is None
 
 
@@ -56,7 +74,11 @@ async def test_health_is_liveness_only_and_returns_minimal_fields(monkeypatch):
     monkeypatch.setattr(health_module, "check_redis", fail)
     request = SimpleNamespace(app=SimpleNamespace(version="1.0.0"))
     result = await health_module.health(request)
-    assert result == {"status": "ok", "version": "1.0.0", "commit": settings.GIT_COMMIT or "unknown"}
+    assert result == {
+        "status": "ok",
+        "version": "1.0.0",
+        "commit": settings.GIT_COMMIT or "unknown",
+    }
 
 
 class FakeRedis:
@@ -76,6 +98,7 @@ async def test_ready_reports_minimal_checks_and_degraded_missing_worker(monkeypa
         return None
 
     client = FakeRedis()
+
     async def redis():
         return client
 
@@ -104,7 +127,9 @@ async def _one_worker():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dependency", ["check_database", "check_migration", "check_storage", "check_redis"])
+@pytest.mark.parametrize(
+    "dependency", ["check_database", "check_migration", "check_storage", "check_redis"]
+)
 async def test_ready_returns_503_without_dependency_details(monkeypatch, dependency):
     async def fail():
         raise RuntimeError(f"private failure {uuid4()}")
@@ -116,6 +141,7 @@ async def test_ready_returns_503_without_dependency_details(monkeypatch, depende
         async def scan_iter(self, match):
             if False:
                 yield None
+
         async def aclose(self):
             return None
 

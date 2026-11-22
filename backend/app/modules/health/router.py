@@ -1,4 +1,5 @@
 """Liveness and readiness endpoints with minimal public responses."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,13 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from alembic.script import ScriptDirectory
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-
 from app.ai_features.resumes.config import get_settings as get_resume_settings
 from app.core.config import settings
 from app.core.database import engine
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 router = APIRouter(tags=["Health"])
 
@@ -22,6 +22,7 @@ async def check_database() -> None:
     async def ping():
         async with engine.connect() as connection:
             await connection.execute(text("select 1"))
+
     await asyncio.wait_for(ping(), timeout=2)
 
 
@@ -40,11 +41,13 @@ async def check_redis() -> Any:
 async def check_migration() -> None:
     root = Path(__file__).resolve().parents[3]
     expected = ScriptDirectory(str(root / "migrations")).get_current_head()
+
     async def current_revision():
         async with engine.connect() as connection:
-            return (await connection.execute(
-                text("SELECT version_num FROM job_sentry.alembic_version")
-            )).scalar_one_or_none()
+            return (
+                await connection.execute(text("SELECT version_num FROM job_sentry.alembic_version"))
+            ).scalar_one_or_none()
+
     current = await asyncio.wait_for(current_revision(), timeout=2)
     if current != expected:
         raise RuntimeError("database migration revision differs from application head")
@@ -67,7 +70,11 @@ async def count_workers(redis: Any) -> int:
 
 @router.get("/health", include_in_schema=True, summary="Check API liveness")
 async def health(request: Request):
-    return {"status": "ok", "version": request.app.version or "unknown", "commit": settings.GIT_COMMIT or "unknown"}
+    return {
+        "status": "ok",
+        "version": request.app.version or "unknown",
+        "commit": settings.GIT_COMMIT or "unknown",
+    }
 
 
 @router.get("/ready", include_in_schema=True, summary="Check API dependencies and worker readiness")
@@ -106,4 +113,6 @@ async def ready():
         if settings.READY_REQUIRE_WORKER:
             failed = True
     status = "not_ready" if failed else "ready"
-    return JSONResponse(status_code=503 if failed else 200, content={"status": status, "checks": checks})
+    return JSONResponse(
+        status_code=503 if failed else 200, content={"status": status, "checks": checks}
+    )

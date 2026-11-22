@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import logging
 import socket
 from datetime import date
-from uuid import uuid4
 
 import httpx
 import pytest
-
 from app.ai_features.models.application import Application
 from app.models.job import EmploymentType, Job, WorkMode
 from app.modules.candidate_intelligence.config import CandidateIntelligenceSettings
@@ -38,7 +35,15 @@ from app.modules.candidate_intelligence.verification.checks import (
         ("not-an-email", "failed"),
         (None, "not_verified"),
     ],
-    ids=["edge-trim", "internal-space", "multiple", "role-domain", "disposable-domain", "invalid", "absent"],
+    ids=[
+        "edge-trim",
+        "internal-space",
+        "multiple",
+        "role-domain",
+        "disposable-domain",
+        "invalid",
+        "absent",
+    ],
 )
 def test_email_verification_matrix(value, status):
     assert email_check(value).status == status
@@ -64,7 +69,18 @@ def test_email_check_disabled_is_not_verified():
         (None, None, "not_verified", None, None),
         ("9876543210", None, "not_verified", None, "region_not_configured"),
     ],
-    ids=["plus-prefix", "local-IN", "international-00", "extension", "multiple", "possible-not-valid", "impossible", "unparseable", "absent", "no-region"],
+    ids=[
+        "plus-prefix",
+        "local-IN",
+        "international-00",
+        "extension",
+        "multiple",
+        "possible-not-valid",
+        "impossible",
+        "unparseable",
+        "absent",
+        "no-region",
+    ],
 )
 def test_phone_verification_matrix(value, region, status, normalized, reason):
     result = phone_check(value, region)
@@ -89,8 +105,15 @@ def test_completeness_threshold_matrix(ratio, status):
 
 
 def test_completeness_thresholds_are_read_from_settings():
-    settings = CandidateIntelligenceSettings(completeness_review_threshold=0.9, completeness_fail_threshold=0.4)
-    result = completeness_check({"completeness": 0.8}, "parsed resume", settings.completeness_review_threshold, settings.completeness_fail_threshold)
+    settings = CandidateIntelligenceSettings(
+        completeness_review_threshold=0.9, completeness_fail_threshold=0.4
+    )
+    result = completeness_check(
+        {"completeness": 0.8},
+        "parsed resume",
+        settings.completeness_review_threshold,
+        settings.completeness_fail_threshold,
+    )
     assert result.status == "needs_review"
 
 
@@ -101,18 +124,70 @@ def test_completeness_without_parsed_resume_is_not_verified():
 @pytest.mark.parametrize(
     ("entries", "expected", "details_key"),
     [
-        ([{"start_date": "2020-01", "end_date": "2020-12"}, {"start_date": "2021-01", "end_date": "2021-12"}], "passed", None),
-        ([{"start_date": "2020-01", "end_date": "2021-12"}, {"start_date": "2021-01", "end_date": "2022-01"}], "needs_review", "overlaps"),
-        ([{"start_date": "2000-01", "end_date": "2000-03"}, {"start_date": "2002-01", "end_date": "2002-03"}], "needs_review", "gaps"),
-        ([{"start_date": "2021-01", "end_date": "2020-01"}, {"start_date": "2022-01", "end_date": "2022-12"}], "failed", "anomalies"),
-        ([{"start_date": "2026-01", "end_date": "2026-12"}, {"start_date": "2022-01", "end_date": "2022-12"}], "failed", "anomalies"),
-        ([{"start_date": "2021-13", "end_date": "2022-01"}, {"start_date": "2022-01", "end_date": "2022-12"}], "failed", "anomalies"),
+        (
+                [
+                    {"start_date": "2020-01", "end_date": "2020-12"},
+                    {"start_date": "2021-01", "end_date": "2021-12"},
+                ],
+                "passed",
+                None,
+        ),
+        (
+                [
+                    {"start_date": "2020-01", "end_date": "2021-12"},
+                    {"start_date": "2021-01", "end_date": "2022-01"},
+                ],
+                "needs_review",
+                "overlaps",
+        ),
+        (
+                [
+                    {"start_date": "2000-01", "end_date": "2000-03"},
+                    {"start_date": "2002-01", "end_date": "2002-03"},
+                ],
+                "needs_review",
+                "gaps",
+        ),
+        (
+                [
+                    {"start_date": "2021-01", "end_date": "2020-01"},
+                    {"start_date": "2022-01", "end_date": "2022-12"},
+                ],
+                "failed",
+                "anomalies",
+        ),
+        (
+                [
+                    {"start_date": "2026-01", "end_date": "2026-12"},
+                    {"start_date": "2022-01", "end_date": "2022-12"},
+                ],
+                "failed",
+                "anomalies",
+        ),
+        (
+                [
+                    {"start_date": "2021-13", "end_date": "2022-01"},
+                    {"start_date": "2022-01", "end_date": "2022-12"},
+                ],
+                "failed",
+                "anomalies",
+        ),
         ([{"start_date": "2020-01", "end_date": "2020-12"}], "not_verified", None),
     ],
-    ids=["no-issues", "overlap", "gap", "end-before-start", "future", "malformed", "fewer-than-two"],
+    ids=[
+        "no-issues",
+        "overlap",
+        "gap",
+        "end-before-start",
+        "future",
+        "malformed",
+        "fewer-than-two",
+    ],
 )
 def test_timeline_matrix(entries, expected, details_key):
-    result = timeline_check(entries, date(2025, 1, 1), overlap_tolerance_months=1, gap_threshold_months=6)
+    result = timeline_check(
+        entries, date(2025, 1, 1), overlap_tolerance_months=1, gap_threshold_months=6
+    )
     assert result.status == expected
     if details_key:
         assert result.details[details_key]
@@ -123,26 +198,75 @@ def test_timeline_matrix(entries, expected, details_key):
 
 def test_duplicate_signal_matrix_and_never_fails():
     company, job, other_job = "company-a", "job-a", "job-b"
-    same_job = {"company_id": company, "job_id": job, "application_id": "app-1", "email": "x@example.com", "phone": "+919876543210", "resume_hash": "abc"}
+    same_job = {
+        "company_id": company,
+        "job_id": job,
+        "application_id": "app-1",
+        "email": "x@example.com",
+        "phone": "+919876543210",
+        "resume_hash": "abc",
+    }
     other_job_row = {**same_job, "job_id": other_job, "application_id": "app-2"}
-    assert duplicate_signals("new@example.com", None, None, [same_job], company, job_id=job).status == "passed"
-    assert duplicate_signals("X@EXAMPLE.COM", None, None, [same_job], company, job_id=job).status == "needs_review"
-    assert duplicate_signals(None, "9876543210", None, [same_job], company, job_id=job, phone_region="IN").status == "needs_review"
-    assert duplicate_signals(None, None, "ABC", [same_job], company, job_id=job).status == "needs_review"
-    assert duplicate_signals("x@example.com", None, None, [other_job_row], company, scope="job", job_id=job).status == "not_verified"
-    assert duplicate_signals("x@example.com", None, None, [other_job_row], company, scope="company", job_id=job).status == "needs_review"
-    assert duplicate_signals(None, None, None, [same_job], company, job_id=job).status == "not_verified"
+    assert (
+            duplicate_signals("new@example.com", None, None, [same_job], company, job_id=job).status
+            == "passed"
+    )
+    assert (
+            duplicate_signals("X@EXAMPLE.COM", None, None, [same_job], company, job_id=job).status
+            == "needs_review"
+    )
+    assert (
+            duplicate_signals(
+                None, "9876543210", None, [same_job], company, job_id=job, phone_region="IN"
+            ).status
+            == "needs_review"
+    )
+    assert (
+            duplicate_signals(None, None, "ABC", [same_job], company, job_id=job).status
+            == "needs_review"
+    )
+    assert (
+            duplicate_signals(
+                "x@example.com", None, None, [other_job_row], company, scope="job", job_id=job
+            ).status
+            == "not_verified"
+    )
+    assert (
+            duplicate_signals(
+                "x@example.com", None, None, [other_job_row], company, scope="company", job_id=job
+            ).status
+            == "needs_review"
+    )
+    assert (
+            duplicate_signals(None, None, None, [same_job], company, job_id=job).status
+            == "not_verified"
+    )
     for email in (None, "missing@example.com", "x@example.com"):
-        assert duplicate_signals(email, None, None, [same_job], company, job_id=job).status != "failed"
+        assert (
+                duplicate_signals(email, None, None, [same_job], company, job_id=job).status != "failed"
+        )
 
 
 def _public_resolver(host, port):
     return ["93.184.216.34"]
 
 
-async def _url_check(handler, *, url="https://example.com/profile", resolver=_public_resolver, check_type="portfolio_url"):
+async def _url_check(
+        handler,
+        *,
+        url="https://example.com/profile",
+        resolver=_public_resolver,
+        check_type="portfolio_url",
+):
     transport = httpx.MockTransport(handler)
-    return await url_reachability_check(url, timeout=0.1, check_type=check_type, enabled=True, transport=transport, resolver=resolver)
+    return await url_reachability_check(
+        url,
+        timeout=0.1,
+        check_type=check_type,
+        enabled=True,
+        transport=transport,
+        resolver=resolver,
+    )
 
 
 @pytest.mark.asyncio
@@ -197,8 +321,12 @@ async def test_url_timeout_and_dns_failure_are_not_verified():
 
 @pytest.mark.asyncio
 async def test_url_reachability_disabled_and_absent_are_not_verified():
-    disabled = await url_reachability_check("https://example.com", enabled=False, resolver=_public_resolver,
-                                             transport=httpx.MockTransport(lambda request: httpx.Response(200)))
+    disabled = await url_reachability_check(
+        "https://example.com",
+        enabled=False,
+        resolver=_public_resolver,
+        transport=httpx.MockTransport(lambda request: httpx.Response(200)),
+    )
     absent = await url_reachability_check(None, enabled=True)
     assert disabled.status == absent.status == "not_verified"
 
@@ -216,12 +344,29 @@ async def test_url_reachability_disabled_and_absent_are_not_verified():
         "http://[fe80::1]/",
         "http://[fd00:ec2::254]/",
     ],
-    ids=["malformed", "non-http", "loopback-v4", "private-v4", "link-local-v4", "metadata-v4", "loopback-v6", "link-local-v6", "metadata-v6"],
+    ids=[
+        "malformed",
+        "non-http",
+        "loopback-v4",
+        "private-v4",
+        "link-local-v4",
+        "metadata-v4",
+        "loopback-v6",
+        "link-local-v6",
+        "metadata-v6",
+    ],
 )
 def test_malformed_non_http_and_ssrf_addresses_fail(url):
     result = portfolio_url_check(url)
     assert result.status == "failed"
-    if "127." in url or "10." in url or "169." in url or "::" in url or "fe80" in url or "fd00" in url:
+    if (
+            "127." in url
+            or "10." in url
+            or "169." in url
+            or "::" in url
+            or "fe80" in url
+            or "fd00" in url
+    ):
         assert result.details["reason_code"] == "ssrf_blocked"
 
 
@@ -321,16 +466,26 @@ def test_normalization_is_idempotent_and_does_not_mutate_raw_values(caplog):
 
 
 @pytest.mark.asyncio
-async def test_verify_response_always_includes_disclaimer(client: httpx.AsyncClient, db_session, company_with_admin, admin_headers):
+async def test_verify_response_always_includes_disclaimer(
+        client: httpx.AsyncClient, db_session, company_with_admin, admin_headers
+):
     company, _ = company_with_admin
-    job = Job(company_id=company.id, title="Verification Role", description="Test", employment_type=EmploymentType.FULL_TIME, work_mode=WorkMode.REMOTE)
+    job = Job(
+        company_id=company.id,
+        title="Verification Role",
+        description="Test",
+        employment_type=EmploymentType.FULL_TIME,
+        work_mode=WorkMode.REMOTE,
+    )
     db_session.add(job)
     await db_session.flush()
     application = Application(company_id=company.id, job_id=job.id, status="applied")
     db_session.add(application)
     await db_session.flush()
 
-    response = await client.post(f"/api/v1/applications/{application.id}/verify", headers=admin_headers)
+    response = await client.post(
+        f"/api/v1/applications/{application.id}/verify", headers=admin_headers
+    )
     assert response.status_code == 200
     payload = response.json()["data"]
     assert "do not prove identity, employment or skill" in payload["disclaimer"]

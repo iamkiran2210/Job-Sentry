@@ -3,10 +3,6 @@ from __future__ import annotations
 import uuid
 from math import ceil
 
-from fastapi import APIRouter, Depends, Header, Query
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.ai_features.models.application import Application
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user
@@ -21,6 +17,9 @@ from app.modules.application_status.schemas import (
 from app.modules.application_status.service import ApplicationStatusService
 from app.modules.jobs.service import JobsService
 from app.utils.responses import success_response
+from fastapi import APIRouter, Depends, Header, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["Applications"])
 
@@ -94,19 +93,21 @@ async def application_status_history(
     base_query = select(ApplicationStatusHistory).where(
         ApplicationStatusHistory.application_id == application_id
     )
-    total = await db.scalar(
-        select(func.count()).select_from(base_query.subquery())
-    )
+    total = await db.scalar(select(func.count()).select_from(base_query.subquery()))
     rows = (
-        await db.execute(
-            base_query.order_by(
-                ApplicationStatusHistory.created_at.desc(),
-                ApplicationStatusHistory.id.desc(),
+        (
+            await db.execute(
+                base_query.order_by(
+                    ApplicationStatusHistory.created_at.desc(),
+                    ApplicationStatusHistory.id.desc(),
+                )
+                .offset((page - 1) * page_size)
+                .limit(page_size)
             )
-            .offset((page - 1) * page_size)
-            .limit(page_size)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     total = int(total or 0)
     return {
         "items": rows,

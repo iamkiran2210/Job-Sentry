@@ -1,4 +1,5 @@
 """Fail-closed target validation for online Alembic commands."""
+
 from __future__ import annotations
 
 import os
@@ -53,8 +54,14 @@ def enforce_database_target(
     is_test_database = "test" in database.casefold()
     safe_target = f"host={host} database={database or '<empty>'}"
     if target == "test" and not is_test_database:
-        print(f"Alembic safety guard: ALEMBIC_TARGET=test requires a database name containing 'test'; {safe_target}.", file=stream)
+        print(
+            f"Alembic safety guard: ALEMBIC_TARGET=test requires a database name containing 'test'; {safe_target}.",
+            file=stream,
+        )
         raise SystemExit(2)
     if not is_test_database and confirmation != database:
-        print(f"Alembic safety guard: online Alembic access refused without ALEMBIC_CONFIRM_DB={database!r}; {safe_target}.", file=stream)
+        print(
+            f"Alembic safety guard: online Alembic access refused without ALEMBIC_CONFIRM_DB={database!r}; {safe_target}.",
+            file=stream,
+        )
         raise SystemExit(2)

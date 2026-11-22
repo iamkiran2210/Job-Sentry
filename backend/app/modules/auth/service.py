@@ -1,8 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Tuple
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
     ConflictException,
@@ -27,15 +25,69 @@ from app.schemas.auth import (
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
+    UserGoogleRegisterRequest,
 )
 from app.schemas.user import UserResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AuthService:
     """Service handling user registration, authentication, token rotation, and Google OAuth."""
 
     @staticmethod
-    async def register_user(
+    async def register_user(db: AsyncSession, request: UserRegisterRequest):
+        email_normalized = request.email.lower().strip()
+
+        # Check for duplicate email
+        result = await db.execute(select(User).where(User.email == email_normalized))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise ConflictException(f"User with email '{email_normalized}' already exists")
+
+        # Hash password with Argon2
+        password_hashed = hash_password(request.password)
+
+        new_user = User(
+            name=request.name.strip(),
+            email=email_normalized,
+            password_hash=password_hashed,
+            role=UserRole.RECRUITER,
+            auth_provider=AuthProvider.EMAIL,
+            is_active=True,
+            is_verified=False,
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        return new_user
+
+    @staticmethod
+    async def register_user_google(db: AsyncSession, request: UserGoogleRegisterRequest):
+        email_normalized = request.email.lower().strip()
+
+        # Check for duplicate email
+        result = await db.execute(select(User).where(User.email == email_normalized))
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise ConflictException(f"User with email '{email_normalized}' already exists")
+
+        new_user = User(
+            name=request.name.strip(),
+            email=email_normalized,
+            password_hash=None,
+            role=UserRole.RECRUITER,
+            auth_provider=AuthProvider.GOOGLE,
+            is_active=True,
+            is_verified=False,
+        )
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        return new_user
+
+    @staticmethod
+    async def register_user_by_admin(
         db: AsyncSession, request: UserRegisterRequest, *, company_id: uuid.UUID
     ) -> User:
         """Register a new user with email and password."""
@@ -113,6 +165,75 @@ class AuthService:
         return token_response, user
 
     @staticmethod
+    async def sign_in_with_google(
+            db: AsyncSession,
+            request: GoogleOAuthRequest,
+    ) -> Tuple[TokenResponse, User]:
+        # 1. Verify Google ID token
+        id_info = verify_google_id_token(request.id_token)
+
+        email = id_info.get("email")
+        email_verified = id_info.get("email_verified", False)
+
+        if not email:
+            raise UnauthorizedException("Google token does not contain an email address")
+
+        if not email_verified:
+            raise UnauthorizedException("Google email address is not verified")
+
+        email = email.lower().strip()
+
+        # 2. Check whether user already exists
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        # 3. Register if user does not exist
+        if not user:
+            register_request = UserGoogleRegisterRequest(
+                email=email,
+                name=id_info.get("name", email.split("@")[0]),
+            )
+
+            user = await AuthService.register_user_google(
+                db,
+                register_request,
+            )
+
+        # 4. Reject inactive accounts
+        if not user.is_active:
+            raise UnauthorizedException("Account is inactive")
+
+        # 5. Issue access token
+        access_token = create_access_token(
+            subject=str(user.id),
+            role=user.role.value,
+            company_id=(str(user.company_id) if user.company_id else None),
+        )
+
+        # 6. Issue refresh token
+        raw_refresh_token, expire_at = create_refresh_token(subject=str(user.id))
+
+        refresh_token_record = RefreshToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_refresh_token),
+            expires_at=expire_at,
+        )
+
+        db.add(refresh_token_record)
+        await db.commit()
+        await db.refresh(user)
+
+        # 7. Return tokens
+        token_response = TokenResponse(
+            access_token=access_token,
+            refresh_token=raw_refresh_token,
+            token_type="bearer",
+            user=UserResponse.model_validate(user),
+        )
+
+        return token_response, user
+
+    @staticmethod
     async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenRefreshResponse:
         """Validate refresh token, enforce single-use rotation, and issue new tokens."""
         if not refresh_token:
@@ -134,9 +255,7 @@ class AuthService:
 
         # Look up persistent token record using cryptographic hash
         token_hash = hash_token(refresh_token)
-        result = await db.execute(
-            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-        )
+        result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
         token_record = result.scalar_one_or_none()
 
         if not token_record:
@@ -218,12 +337,9 @@ class AuthService:
     ) -> Tuple[TokenResponse, User]:
         """Issue fresh tokens after verifying the authenticated user's Google email."""
         id_info = verify_google_id_token(request.id_token)
-
         email = id_info.get("email")
         if not email:
-            raise UnauthorizedException(
-                "Google token does not contain an email address"
-            )
+            raise UnauthorizedException("Google token does not contain an email address")
 
         email_verified = id_info.get("email_verified", False)
         if not email_verified:

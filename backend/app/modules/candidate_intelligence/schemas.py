@@ -1,16 +1,37 @@
 """HTTP contracts for the candidate intelligence API."""
+
 from __future__ import annotations
 
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 from app.utils.responses import ApiResponse
-
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 VerificationStatus = Literal["passed", "needs_review", "not_verified", "failed"]
 Eligibility = Literal["eligible", "needs_review", "potentially_ineligible"]
+DecisionAgentId = Literal["balanced", "bar_raiser", "growth_potential", "risk_guardian"]
+DecisionOutcome = Literal["strong_advance", "advance", "review", "hold", "pass"]
+
+
+class DecisionAgentMeta(BaseModel):
+    id: DecisionAgentId
+    name: str
+    short_name: str
+    tagline: str
+
+
+class AgentDecision(BaseModel):
+    agent_id: DecisionAgentId
+    agent_name: str
+    decision: DecisionOutcome
+    threshold_outcome: Literal["accept", "reject", "review"] | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    summary: str
+    next_step: str
+    key_factors: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    mode: str = "deterministic"
 
 
 class VerificationCheck(BaseModel):
@@ -20,9 +41,16 @@ class VerificationCheck(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class FraudRiskSummary(BaseModel):
+    score: int = Field(ge=0, le=100)
+    level: Literal["low", "medium", "high"]
+    flags: list[str] = Field(default_factory=list)
+
+
 class VerifyData(BaseModel):
     overall_status: VerificationStatus
     checks: list[VerificationCheck]
+    fraud_risk: FraudRiskSummary | None = None
     disclaimer: str
 
 
@@ -55,6 +83,14 @@ class ResumeDetail(BaseModel):
     parser_version: str | None
     extraction_version: str | int | None
     content_hash_prefix: str
+    overall_confidence: float | None = None
+    extraction_method: str | None = None
+    ai_engine: str | None = None
+    ai_model: str | None = None
+    prompt_version: str | None = None
+    ocr_used: bool = False
+    ocr_confidence: float | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ApplicationDetail(BaseModel):
@@ -81,6 +117,7 @@ class ScoreDetail(BaseModel):
 class VerificationDetail(BaseModel):
     overall_status: VerificationStatus
     checks: list[VerificationCheck]
+    fraud_risk: FraudRiskSummary | None = None
 
 
 class ExplanationDetail(BaseModel):
@@ -139,6 +176,8 @@ class AnalysisData(BaseModel):
     score_detail: ScoreDetail | None
     evidence_groups: list[dict[str, Any]]
     explanation: ExplanationDetail
+    decision: AgentDecision | None = None
+    agent_decisions: dict[str, AgentDecision] = Field(default_factory=dict)
 
 
 class RankRequest(BaseModel):
@@ -154,10 +193,19 @@ class RankRequest(BaseModel):
     scoring_version: str | None = None
     application_ids: list[UUID] | None = None
     force_rescore: bool = False
+    force_verify: bool = False
+    decision_agent: DecisionAgentId | None = None
+    decision: DecisionOutcome | None = None
+    min_accept_threshold: float | None = Field(default=None, ge=0, le=100)
+    auto_apply_decisions: bool = False
 
     @model_validator(mode="after")
     def validate_score_range(self):
-        if self.min_score is not None and self.max_score is not None and self.min_score > self.max_score:
+        if (
+                self.min_score is not None
+                and self.max_score is not None
+                and self.min_score > self.max_score
+        ):
             raise ValueError("min_score must be less than or equal to max_score")
         return self
 
@@ -172,6 +220,8 @@ class RankedItem(BaseModel):
     status: str
     verification_statuses: list[str] = Field(default_factory=list)
     rank: int
+    decision: AgentDecision | None = None
+    agent_decisions: dict[str, AgentDecision] = Field(default_factory=dict)
 
 
 class RankData(BaseModel):
@@ -184,6 +234,14 @@ class RankData(BaseModel):
     algorithm_version: str
     config_hash: str | None = None
     provider_snapshot: dict[str, Any] = Field(default_factory=dict)
+    verified_count: int = 0
+    decision_agent: DecisionAgentId = "balanced"
+    min_accept_threshold: float | None = None
+    auto_applied_count: int = 0
+    notifications_sent: int = 0
+    notifications_failed: int = 0
+    notification_results: list[dict[str, Any]] = Field(default_factory=list)
+    available_decision_agents: list[DecisionAgentMeta] = Field(default_factory=list)
     items: list[RankedItem]
 
 
@@ -196,6 +254,38 @@ class RankingPage(BaseModel):
     scoring_version: str | None = None
     algorithm_version: str | None = None
     filters_applied: dict[str, Any] = Field(default_factory=dict)
+    decision_agent: DecisionAgentId = "balanced"
+    min_accept_threshold: float | None = None
+    available_decision_agents: list[DecisionAgentMeta] = Field(default_factory=list)
+
+
+class NotifyCandidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    outcome: Literal["shortlisted", "rejected"] | None = None
+    feedback: str | None = Field(default=None, max_length=1000)
+    include_score: bool = True
+
+
+class NotifyCandidateData(BaseModel):
+    application_id: UUID
+    delivered: bool
+    channel: str
+    reason: str
+    recipient: str | None = None
+    subject: str
+    preview: str
+    sent_at: str
+
+
+NotifyCandidateResponse = ApiResponse[NotifyCandidateData]
+
+
+class DecisionAgentsListData(BaseModel):
+    default_agent: DecisionAgentId = "balanced"
+    agents: list[DecisionAgentMeta]
+
+
+DecisionAgentsResponse = ApiResponse[DecisionAgentsListData]
 
 
 class RankingRunSummary(BaseModel):

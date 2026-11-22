@@ -86,8 +86,7 @@ async def get_company_members(
 ):
     members = await CompaniesService.get_company_members(db, current_user)
     serialized_members = [
-        UserPublicResponse.model_validate(m).model_dump(mode="json")
-        for m in members
+        UserPublicResponse.model_validate(m).model_dump(mode="json") for m in members
     ]
     return success_response(
         data=serialized_members,
@@ -113,6 +112,20 @@ async def add_company_member(
         message="Company access granted successfully",
         status_code=status.HTTP_201_CREATED,
     )
+
+
+@router.delete(
+    "/me/members",
+    status_code=status.HTTP_200_OK,
+    summary="Remove all non-admin company members (Data Explorer)",
+    description="Removes all non-administrator recruiters from the current company while preserving company administrators.",
+)
+async def remove_all_company_members(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
+    counts = await CompaniesService.remove_all_company_members(db, current_user)
+    return success_response(counts, "All removable team members removed successfully")
 
 
 @router.delete(

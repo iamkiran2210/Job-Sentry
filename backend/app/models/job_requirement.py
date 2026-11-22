@@ -4,7 +4,16 @@ from typing import TYPE_CHECKING
 
 from app.models.base import BaseModel
 from app.models.job import enum_values
-from sqlalchemy import Boolean, CheckConstraint, Enum, Float, ForeignKey, String, Uuid, Index
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    Float,
+    ForeignKey,
+    String,
+    Uuid,
+    Index,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -41,17 +50,33 @@ class JobRequirement(BaseModel):
     )
 
     job_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     category: Mapped[RequirementCategory] = mapped_column(
-        Enum(RequirementCategory, native_enum=False, values_callable=enum_values, length=40), nullable=False
+        Enum(
+            RequirementCategory,
+            native_enum=False,
+            values_callable=enum_values,
+            length=40,
+        ),
+        nullable=False,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     requirement_type: Mapped[RequirementType] = mapped_column(
-        Enum(RequirementType, native_enum=False, values_callable=enum_values, length=30), nullable=False
+        Enum(RequirementType, native_enum=False, values_callable=enum_values, length=30),
+        nullable=False,
     )
     importance: Mapped[RequirementImportance] = mapped_column(
-        Enum(RequirementImportance, native_enum=False, values_callable=enum_values, length=20), nullable=False
+        Enum(
+            RequirementImportance,
+            native_enum=False,
+            values_callable=enum_values,
+            length=20,
+        ),
+        nullable=False,
     )
     weight: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     is_mandatory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

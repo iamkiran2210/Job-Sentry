@@ -3,10 +3,10 @@
 Revision ID: d7f43ae83c10
 Revises: c2f6b1a8d904
 """
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "d7f43ae83c10"
 down_revision = "c2f6b1a8d904"
@@ -31,11 +31,19 @@ def upgrade() -> None:
             "status IN ('available', 'pending', 'failed', 'unavailable')",
             name="ck_score_explanation_status_valid",
         ),
-        sa.ForeignKeyConstraint(["candidate_score_id"], ["candidate_scores.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["candidate_score_id"], ["candidate_scores.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_score_explanation_candidate_score_id", "score_explanation", ["candidate_score_id"])
-    op.create_index("ix_score_explanation_score_created", "score_explanation", ["candidate_score_id", "created_at"])
+    op.create_index(
+        "ix_score_explanation_candidate_score_id", "score_explanation", ["candidate_score_id"]
+    )
+    op.create_index(
+        "ix_score_explanation_score_created",
+        "score_explanation",
+        ["candidate_score_id", "created_at"],
+    )
 
 
 def downgrade() -> None:

@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user, require_company_admin
 from app.models.user import User
@@ -14,26 +11,64 @@ from app.schemas.auth import (
 )
 from app.schemas.user import UserResponse
 from app.utils.responses import success_response
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post(
     "/register",
-    status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
     description="Registers a new user with name, email, and strong password.",
 )
 async def register(
     request: UserRegisterRequest,
     db: AsyncSession = Depends(get_db),
-    current_admin: User = Depends(require_company_admin),
 ):
-    user = await AuthService.register_user(db, request, company_id=current_admin.company_id)
+    user = await AuthService.register_user(db, request)
     return success_response(
         data=UserResponse.model_validate(user).model_dump(mode="json"),
         message="User registered successfully",
         status_code=status.HTTP_201_CREATED,
+    )
+
+
+@router.post(
+    "/admin/register",
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user with admin",
+    description="Registers a new user with name, email, and strong password.",
+)
+async def register_admin(
+        request: UserRegisterRequest,
+        db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_company_admin),
+):
+    user = await AuthService.register_user_by_admin(
+        db, request, company_id=current_admin.company_id
+    )
+    return success_response(
+        data=UserResponse.model_validate(user).model_dump(mode="json"),
+        message="User registered successfully",
+        status_code=status.HTTP_201_CREATED,
+    )
+
+
+@router.post("/sign/google")
+async def google_sign_in(
+        request: GoogleOAuthRequest,
+        db: AsyncSession = Depends(get_db),
+):
+    token_response, user = await AuthService.sign_in_with_google(
+        db,
+        request,
+    )
+
+    return success_response(
+        data=token_response.model_dump(mode="json"),
+        message="Login successful",
+        status_code=status.HTTP_200_OK,
     )
 
 

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
-
 from app.core.database import Base
 from app.models.base import BaseModel
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, Uuid
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ApplicationStatusHistory(BaseModel):
@@ -30,12 +29,8 @@ class ApplicationStatusHistory(BaseModel):
     application_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("applications.id"), nullable=False
     )
-    job_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("jobs.id"), nullable=False
-    )
-    company_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("companies.id"), nullable=False
-    )
+    job_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("jobs.id"), nullable=False)
+    company_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("companies.id"), nullable=False)
     from_status: Mapped[str | None] = mapped_column(String(20))
     to_status: Mapped[str] = mapped_column(String(20), nullable=False)
     actor_type: Mapped[str] = mapped_column(String(10), nullable=False)

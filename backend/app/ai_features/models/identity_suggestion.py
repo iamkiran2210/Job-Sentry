@@ -1,10 +1,9 @@
 import uuid
 
+from app.models.base import BaseModel
 from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.models.base import BaseModel
 
 JsonType = JSON().with_variant(JSONB(), "postgresql")
 
@@ -36,7 +35,5 @@ class IdentitySuggestion(BaseModel):
 
     __table_args__ = (
         UniqueConstraint("candidate_id", "other_candidate_id", name="uq_identity_pair"),
-        CheckConstraint(
-            "candidate_id <> other_candidate_id", name="ck_identity_distinct"
-        ),
+        CheckConstraint("candidate_id <> other_candidate_id", name="ck_identity_distinct"),
     )

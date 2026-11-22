@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -14,7 +13,9 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.requires_pgvector
 async def test_alembic_db_fixture_builds_schema_through_migrations(alembic_db: AsyncEngine):
     async with alembic_db.connect() as connection:
-        version = await connection.scalar(text("SELECT version_num FROM job_sentry.alembic_version"))
+        version = await connection.scalar(
+            text("SELECT version_num FROM job_sentry.alembic_version")
+        )
         evidence_table = await connection.scalar(
             text("SELECT to_regclass('job_sentry.score_evidence') IS NOT NULL")
         )

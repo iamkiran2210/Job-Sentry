@@ -15,6 +15,7 @@ class UserBase(BaseModel):
 
 class UserResponse(BaseModel):
     """Full user response schema without sensitive fields."""
+
     id: uuid.UUID
     name: str
     email: str
@@ -31,6 +32,7 @@ class UserResponse(BaseModel):
 
 class UserPublicResponse(BaseModel):
     """Public user response for company member lists."""
+
     id: uuid.UUID
     name: str
     email: str

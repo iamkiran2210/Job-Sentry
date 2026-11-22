@@ -3,9 +3,9 @@
 Revision ID: c2f6b1a8d904
 Revises: a91d6e4f2b70
 """
-from alembic import op
-import sqlalchemy as sa
 
+import sqlalchemy as sa
+from alembic import op
 
 revision = "c2f6b1a8d904"
 down_revision = "a91d6e4f2b70"
@@ -40,8 +40,11 @@ def upgrade() -> None:
             ELSE 'applied' END"""
     )
     op.alter_column(
-        "applications", "status", existing_type=sa.String(20),
-        server_default=sa.text("'applied'"), existing_nullable=False,
+        "applications",
+        "status",
+        existing_type=sa.String(20),
+        server_default=sa.text("'applied'"),
+        existing_nullable=False,
     )
     op.create_check_constraint(
         "ck_applications_status_valid", "applications", f"status IN ({STATUSES})"
@@ -68,9 +71,7 @@ def upgrade() -> None:
             f"from_status IS NULL OR from_status IN ({STATUSES})",
             name="ck_application_status_from_valid",
         ),
-        sa.CheckConstraint(
-            f"to_status IN ({STATUSES})", name="ck_application_status_to_valid"
-        ),
+        sa.CheckConstraint(f"to_status IN ({STATUSES})", name="ck_application_status_to_valid"),
         sa.ForeignKeyConstraint(["application_id"], ["applications.id"]),
         sa.ForeignKeyConstraint(["job_id"], ["jobs.id"]),
         sa.ForeignKeyConstraint(["company_id"], ["companies.id"]),
@@ -78,11 +79,13 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_application_status_history_application_created",
-        "application_status_history", ["application_id", "created_at"],
+        "application_status_history",
+        ["application_id", "created_at"],
     )
     op.create_index(
         "ix_application_status_history_company_created",
-        "application_status_history", ["company_id", "created_at"],
+        "application_status_history",
+        ["company_id", "created_at"],
     )
     op.execute("""
         CREATE FUNCTION reject_application_status_history_mutation() RETURNS trigger AS $$
@@ -99,7 +102,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS application_status_history_append_only ON application_status_history")
+    op.execute(
+        "DROP TRIGGER IF EXISTS application_status_history_append_only ON application_status_history"
+    )
     op.execute("DROP FUNCTION IF EXISTS reject_application_status_history_mutation()")
     op.drop_table("application_status_history")
     op.drop_constraint("ck_applications_status_valid", "applications", type_="check")

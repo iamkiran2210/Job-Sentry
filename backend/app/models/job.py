@@ -46,16 +46,21 @@ class Job(BaseModel):
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     employment_type: Mapped[EmploymentType] = mapped_column(
-        Enum(EmploymentType, native_enum=False, values_callable=enum_values, length=30), nullable=False
+        Enum(EmploymentType, native_enum=False, values_callable=enum_values, length=30),
+        nullable=False,
     )
     work_mode: Mapped[WorkMode] = mapped_column(
-        Enum(WorkMode, native_enum=False, values_callable=enum_values, length=30), nullable=False
+        Enum(WorkMode, native_enum=False, values_callable=enum_values, length=30),
+        nullable=False,
     )
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     openings: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
@@ -68,7 +73,10 @@ class Job(BaseModel):
 
     company: Mapped["Company"] = relationship("Company", back_populates="jobs", lazy="selectin")
     requirements: Mapped[List["JobRequirement"]] = relationship(
-        "JobRequirement", back_populates="job", cascade="all, delete-orphan", lazy="selectin"
+        "JobRequirement",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     access_grants: Mapped[List["JobAccess"]] = relationship(
         "JobAccess", cascade="all, delete-orphan", lazy="raise"

@@ -5,14 +5,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import jwt
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
-from google.auth.transport import requests as google_requests
-from google.auth.exceptions import GoogleAuthError
-from google.oauth2 import id_token
-
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedException
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 
 # Argon2 password hasher instance
 pwd_hasher = PasswordHasher()
@@ -123,7 +122,6 @@ def verify_google_id_token(token: str) -> Dict[str, Any]:
         request = google_requests.Request()
         audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
         id_info = id_token.verify_oauth2_token(token, request, audience=audience)
-
         issuer = id_info.get("iss")
         if issuer not in ["accounts.google.com", "https://accounts.google.com"]:
             raise UnauthorizedException("Invalid Google token issuer")

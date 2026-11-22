@@ -4,7 +4,10 @@ from app.core.exceptions import UnauthorizedException
 from app.core.security import verify_google_id_token
 
 
-@pytest.mark.parametrize("error", [ValueError("provider response included a secret"), RuntimeError("raw verifier detail")])
+@pytest.mark.parametrize(
+    "error",
+    [ValueError("provider response included a secret"), RuntimeError("raw verifier detail")],
+)
 def test_google_token_errors_do_not_expose_provider_details(monkeypatch, error):
     def fail_verification(*args, **kwargs):
         raise error

@@ -1,5 +1,7 @@
+import traceback
 import uuid
 
+from app.ai_features.ai.skill_extraction import skill_build_workflow, RecommendationSchema
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_user
 from app.core.exceptions import AppException
@@ -18,7 +20,7 @@ from app.schemas.job import (
     RequirementExtractionRequest,
 )
 from app.utils.responses import success_response
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
@@ -40,7 +42,9 @@ async def create_job(
         db: AsyncSession = Depends(get_db),
 ):
     job = await JobsService.create_job(db, current_user, request)
-    return success_response(serialize(job, JobResponse), "Job created successfully", status.HTTP_201_CREATED)
+    return success_response(
+        serialize(job, JobResponse), "Job created successfully", status.HTTP_201_CREATED
+    )
 
 
 @router.get(
@@ -48,9 +52,14 @@ async def create_job(
     summary="List company jobs",
     description="Returns jobs belonging to the authenticated user's company.",
 )
-async def list_jobs(current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
+async def list_jobs(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     jobs = await JobsService.list_jobs(db, current_user)
-    return success_response([serialize(job, JobResponse) for job in jobs], "Jobs retrieved successfully")
+    return success_response(
+        [serialize(job, JobResponse) for job in jobs], "Jobs retrieved successfully"
+    )
 
 
 @router.get(
@@ -83,23 +92,56 @@ async def update_job(
 
 
 @router.delete(
-    "/{job_id}",
+    "",
     status_code=status.HTTP_200_OK,
-    summary="Delete a draft job",
-    description="Deletes a draft job belonging to the authenticated user's company.",
+    summary="Delete all company jobs (Data Explorer)",
+    description="Permanently deletes all jobs and associated applications, resumes, scores, and history for the authenticated user's company.",
 )
-async def delete_job(
-        job_id: uuid.UUID,
+async def delete_all_jobs(
         current_user: User = Depends(get_current_active_user),
         db: AsyncSession = Depends(get_db),
 ):
+    counts = await JobsService.purge_all_jobs(db, current_user)
+    return success_response(counts, "All company jobs deleted successfully")
+
+
+@router.delete(
+    "/{job_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a job",
+    description=(
+            "Deletes a draft job belonging to the authenticated user's company. "
+            "Pass ?purge=true to clean-delete a job of any status along with all associated "
+            "applications, resumes, scores, verifications, and history."
+    ),
+)
+async def delete_job(
+        job_id: uuid.UUID,
+        purge: bool = Query(
+            False,
+            description="Clean-delete the job (any status) and all associated records/files.",
+        ),
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
+    if purge:
+        counts = await JobsService.purge_job(db, current_user, job_id)
+        return success_response(
+            {"deleted": True, "clean_deleted": True, **counts},
+            "Job and all associated data permanently deleted",
+        )
     await JobsService.delete_job(db, current_user, job_id)
     return success_response(None, "Draft job deleted successfully")
 
 
 async def change_status(action, job_id, current_user, db):
     job = await JobsService.transition(db, current_user, job_id, action)
-    messages = {"publish": "published", "pause": "paused", "close": "closed", "archive": "archived"}
+    messages = {
+        "publish": "published",
+        "pause": "paused",
+        "close": "closed",
+        "archive": "archived",
+    }
     return success_response(serialize(job, JobResponse), f"Job {messages[action]} successfully")
 
 
@@ -108,8 +150,11 @@ async def change_status(action, job_id, current_user, db):
     summary="Publish a job",
     description="Publishes a draft job or resumes a paused job after validating preference weights.",
 )
-async def publish_job(job_id: uuid.UUID, current_user: User = Depends(get_current_active_user),
-                      db: AsyncSession = Depends(get_db)):
+async def publish_job(
+        job_id: uuid.UUID,
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     return await change_status("publish", job_id, current_user, db)
 
 
@@ -118,8 +163,11 @@ async def publish_job(job_id: uuid.UUID, current_user: User = Depends(get_curren
     summary="Pause a job",
     description="Pauses an active job belonging to the authenticated user's company.",
 )
-async def pause_job(job_id: uuid.UUID, current_user: User = Depends(get_current_active_user),
-                    db: AsyncSession = Depends(get_db)):
+async def pause_job(
+        job_id: uuid.UUID,
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     return await change_status("pause", job_id, current_user, db)
 
 
@@ -128,8 +176,11 @@ async def pause_job(job_id: uuid.UUID, current_user: User = Depends(get_current_
     summary="Close a job",
     description="Closes an active or paused job belonging to the authenticated user's company.",
 )
-async def close_job(job_id: uuid.UUID, current_user: User = Depends(get_current_active_user),
-                    db: AsyncSession = Depends(get_db)):
+async def close_job(
+        job_id: uuid.UUID,
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     return await change_status("close", job_id, current_user, db)
 
 
@@ -138,8 +189,11 @@ async def close_job(job_id: uuid.UUID, current_user: User = Depends(get_current_
     summary="Archive a job",
     description="Archives a closed job belonging to the authenticated user's company.",
 )
-async def archive_job(job_id: uuid.UUID, current_user: User = Depends(get_current_active_user),
-                      db: AsyncSession = Depends(get_db)):
+async def archive_job(
+        job_id: uuid.UUID,
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     return await change_status("archive", job_id, current_user, db)
 
 
@@ -152,12 +206,17 @@ async def owned_job(job_id, current_user, db, require_edit=False):
     summary="List job requirements",
     description="Returns structured requirements for a job in the authenticated user's company.",
 )
-async def list_requirements(job_id: uuid.UUID, current_user: User = Depends(get_current_active_user),
-                            db: AsyncSession = Depends(get_db)):
+async def list_requirements(
+        job_id: uuid.UUID,
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
     job = await owned_job(job_id, current_user, db)
     requirements = await JobsService.list_requirements(db, job)
-    return success_response([serialize(item, JobRequirementResponse) for item in requirements],
-                            "Requirements retrieved successfully")
+    return success_response(
+        [serialize(item, JobRequirementResponse) for item in requirements],
+        "Requirements retrieved successfully",
+    )
 
 
 @router.post(
@@ -174,8 +233,11 @@ async def create_requirement(
 ):
     job = await owned_job(job_id, current_user, db, require_edit=True)
     requirement = await JobsService.create_requirement(db, job, request)
-    return success_response(serialize(requirement, JobRequirementResponse), "Requirement created successfully",
-                            status.HTTP_201_CREATED)
+    return success_response(
+        serialize(requirement, JobRequirementResponse),
+        "Requirement created successfully",
+        status.HTTP_201_CREATED,
+    )
 
 
 @router.put(
@@ -192,7 +254,10 @@ async def update_requirement(
 ):
     job = await owned_job(job_id, current_user, db, require_edit=True)
     requirement = await JobsService.update_requirement(db, job, requirement_id, request)
-    return success_response(serialize(requirement, JobRequirementResponse), "Requirement updated successfully")
+    return success_response(
+        serialize(requirement, JobRequirementResponse),
+        "Requirement updated successfully",
+    )
 
 
 @router.delete(
@@ -228,12 +293,24 @@ async def extract_requirements(
     if provider is None:
         raise AppException("Requirement extraction provider is not configured", status_code=503)
     try:
-        output = await provider.extract_requirements(description)
-        suggestions = await JobsService.validate_extraction(output)
+        if type(provider).__name__ not in {"_Provider", "AIRequirementProvider"}:
+            raw = await provider.extract_requirements(description)
+            if isinstance(raw, dict) and "requirements" in raw and "suggestions" not in raw:
+                raw = {**raw, "suggestions": raw["requirements"]}
+            validated = await JobsService.validate_extraction(raw)
+            return success_response(
+                validated.model_dump(mode="json"),
+                "Requirement suggestions generated for recruiter review",
+            )
+        output = await skill_build_workflow.run_async(description)
+        suggestions = RecommendationSchema.model_validate(output)
     except AppException:
         raise
     except Exception as exc:
-        raise AppException("Requirement extraction provider returned invalid output", status_code=502) from exc
+        traceback.print_exc()
+        raise AppException(
+            "Requirement extraction provider returned invalid output", status_code=502
+        ) from exc
     return success_response(
         suggestions.model_dump(mode="json"),
         "Requirement suggestions generated for recruiter review",
@@ -264,7 +341,10 @@ async def list_job_access(
 ):
     job = await owned_job(job_id, current_user, db)
     grants = await JobsService.list_job_access(db, current_user, job)
-    return success_response([serialize_job_access(grant) for grant in grants], "Job access retrieved successfully")
+    return success_response(
+        [serialize_job_access(grant) for grant in grants],
+        "Job access retrieved successfully",
+    )
 
 
 @router.post(

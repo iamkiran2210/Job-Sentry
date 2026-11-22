@@ -3,10 +3,10 @@
 Revision ID: e82c4a91d307
 Revises: d6f3a810bc42
 """
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "e82c4a91d307"
 down_revision = "d6f3a810bc42"
@@ -19,7 +19,10 @@ JsonType = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 def upgrade():
     op.add_column("candidate_scores", sa.Column("as_of_date", sa.Date(), nullable=True))
     op.add_column("ranking_history", sa.Column("config_hash", sa.String(64), nullable=True))
-    op.add_column("ranking_history", sa.Column("provider_snapshot", JsonType, nullable=False, server_default="{}"))
+    op.add_column(
+        "ranking_history",
+        sa.Column("provider_snapshot", JsonType, nullable=False, server_default="{}"),
+    )
 
     evidence_columns = [
         sa.Column("source_location", sa.Text(), nullable=True),
@@ -45,10 +48,14 @@ def upgrade():
     # d6 introduced these JSON fields before the ORM standardized PostgreSQL
     # storage on JSONB. Convert them here so a fresh database matches metadata.
     op.alter_column("candidate_scores", "mandatory_results", server_default=None)
-    op.execute("ALTER TABLE candidate_scores ALTER COLUMN mandatory_results TYPE JSONB USING mandatory_results::jsonb")
+    op.execute(
+        "ALTER TABLE candidate_scores ALTER COLUMN mandatory_results TYPE JSONB USING mandatory_results::jsonb"
+    )
     op.alter_column("candidate_scores", "mandatory_results", server_default=sa.text("'[]'::jsonb"))
     op.alter_column("ranking_history", "tie_break_key", server_default=None)
-    op.execute("ALTER TABLE ranking_history ALTER COLUMN tie_break_key TYPE JSONB USING tie_break_key::jsonb")
+    op.execute(
+        "ALTER TABLE ranking_history ALTER COLUMN tie_break_key TYPE JSONB USING tie_break_key::jsonb"
+    )
     op.alter_column("ranking_history", "tie_break_key", server_default=sa.text("'{}'::jsonb"))
     op.execute("ALTER TABLE candidate_scores ALTER COLUMN job_id SET NOT NULL")
     op.execute("ALTER TABLE ranking_history ALTER COLUMN run_id SET NOT NULL")
@@ -56,18 +63,42 @@ def upgrade():
     for table in ("candidate_scores", "score_evidence", "verification_results", "ranking_history"):
         op.create_index(f"ix_{table}_id", table, ["id"])
     with op.batch_alter_table("score_evidence") as batch:
-        batch.create_check_constraint("ck_score_evidence_value_range", "value IS NULL OR (value >= 0 AND value <= 1)")
-        batch.create_check_constraint("ck_score_evidence_similarity_range", "similarity IS NULL OR (similarity >= -1 AND similarity <= 1)")
+        batch.create_check_constraint(
+            "ck_score_evidence_value_range", "value IS NULL OR (value >= 0 AND value <= 1)"
+        )
+        batch.create_check_constraint(
+            "ck_score_evidence_similarity_range",
+            "similarity IS NULL OR (similarity >= -1 AND similarity <= 1)",
+        )
     with op.batch_alter_table("candidate_scores") as batch:
-        batch.create_check_constraint("ck_candidate_score_range", "score IS NULL OR (score >= 0 AND score <= 100)")
-        batch.create_check_constraint("ck_candidate_score_lower_range", "score_lower_bound IS NULL OR (score_lower_bound >= 0 AND score_lower_bound <= 100)")
-        batch.create_check_constraint("ck_candidate_score_upper_range", "score_upper_bound IS NULL OR (score_upper_bound >= 0 AND score_upper_bound <= 100)")
-        batch.create_check_constraint("ck_candidate_score_completeness_range", "data_completeness >= 0 AND data_completeness <= 1")
-        batch.create_check_constraint("ck_candidate_score_eligibility_valid", "eligibility IN ('eligible', 'needs_review', 'potentially_ineligible')")
+        batch.create_check_constraint(
+            "ck_candidate_score_range", "score IS NULL OR (score >= 0 AND score <= 100)"
+        )
+        batch.create_check_constraint(
+            "ck_candidate_score_lower_range",
+            "score_lower_bound IS NULL OR (score_lower_bound >= 0 AND score_lower_bound <= 100)",
+        )
+        batch.create_check_constraint(
+            "ck_candidate_score_upper_range",
+            "score_upper_bound IS NULL OR (score_upper_bound >= 0 AND score_upper_bound <= 100)",
+        )
+        batch.create_check_constraint(
+            "ck_candidate_score_completeness_range",
+            "data_completeness >= 0 AND data_completeness <= 1",
+        )
+        batch.create_check_constraint(
+            "ck_candidate_score_eligibility_valid",
+            "eligibility IN ('eligible', 'needs_review', 'potentially_ineligible')",
+        )
     with op.batch_alter_table("verification_results") as batch:
-        batch.create_check_constraint("ck_verification_status_valid", "status IN ('passed', 'needs_review', 'not_verified', 'failed')")
+        batch.create_check_constraint(
+            "ck_verification_status_valid",
+            "status IN ('passed', 'needs_review', 'not_verified', 'failed')",
+        )
     with op.batch_alter_table("ranking_history") as batch:
-        batch.create_unique_constraint("uq_ranking_history_run_application", ["job_id", "run_id", "application_id"])
+        batch.create_unique_constraint(
+            "uq_ranking_history_run_application", ["job_id", "run_id", "application_id"]
+        )
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         op.execute("""
@@ -75,9 +106,13 @@ def upgrade():
         BEGIN RAISE EXCEPTION 'ranking history rows are immutable'; END;
         $$ LANGUAGE plpgsql
         """)
-        op.execute("CREATE TRIGGER trg_ranking_history_immutable BEFORE UPDATE ON ranking_history FOR EACH ROW EXECUTE FUNCTION prevent_ranking_history_update()")
+        op.execute(
+            "CREATE TRIGGER trg_ranking_history_immutable BEFORE UPDATE ON ranking_history FOR EACH ROW EXECUTE FUNCTION prevent_ranking_history_update()"
+        )
     elif bind.dialect.name == "sqlite":
-        op.execute("CREATE TRIGGER trg_ranking_history_immutable BEFORE UPDATE ON ranking_history BEGIN SELECT RAISE(ABORT, 'ranking history rows are immutable'); END")
+        op.execute(
+            "CREATE TRIGGER trg_ranking_history_immutable BEFORE UPDATE ON ranking_history BEGIN SELECT RAISE(ABORT, 'ranking history rows are immutable'); END"
+        )
 
 
 def downgrade():
@@ -86,10 +121,14 @@ def downgrade():
     op.execute("ALTER TABLE candidate_scores ALTER COLUMN job_id DROP NOT NULL")
     op.execute("ALTER TABLE ranking_history ALTER COLUMN run_id DROP NOT NULL")
     op.alter_column("ranking_history", "tie_break_key", server_default=None)
-    op.execute("ALTER TABLE ranking_history ALTER COLUMN tie_break_key TYPE JSON USING tie_break_key::json")
+    op.execute(
+        "ALTER TABLE ranking_history ALTER COLUMN tie_break_key TYPE JSON USING tie_break_key::json"
+    )
     op.alter_column("ranking_history", "tie_break_key", server_default=sa.text("'{}'::json"))
     op.alter_column("candidate_scores", "mandatory_results", server_default=None)
-    op.execute("ALTER TABLE candidate_scores ALTER COLUMN mandatory_results TYPE JSON USING mandatory_results::json")
+    op.execute(
+        "ALTER TABLE candidate_scores ALTER COLUMN mandatory_results TYPE JSON USING mandatory_results::json"
+    )
     op.alter_column("candidate_scores", "mandatory_results", server_default=sa.text("'[]'::json"))
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
@@ -110,7 +149,24 @@ def downgrade():
     with op.batch_alter_table("score_evidence") as batch:
         batch.drop_constraint("ck_score_evidence_similarity_range", type_="check")
         batch.drop_constraint("ck_score_evidence_value_range", type_="check")
-    for name in ("is_proof", "input_hash", "model_name", "error", "grounded", "supporting_quotes", "rationale", "similarity", "model_version", "compared_texts", "match_type", "alias_used", "canonical_term", "requirement_term", "matched_term", "source_location"):
+    for name in (
+            "is_proof",
+            "input_hash",
+            "model_name",
+            "error",
+            "grounded",
+            "supporting_quotes",
+            "rationale",
+            "similarity",
+            "model_version",
+            "compared_texts",
+            "match_type",
+            "alias_used",
+            "canonical_term",
+            "requirement_term",
+            "matched_term",
+            "source_location",
+    ):
         op.drop_column("score_evidence", name)
     op.drop_column("ranking_history", "provider_snapshot")
     op.drop_column("ranking_history", "config_hash")

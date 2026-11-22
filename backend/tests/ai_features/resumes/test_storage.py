@@ -1,6 +1,6 @@
-import pytest
 import uuid
 
+import pytest
 from app.ai_features.resumes.config import ResumeSettings
 from app.ai_features.resumes.errors import StorageError, StorageObjectMissing
 from app.ai_features.resumes.storage import build_key
@@ -39,9 +39,7 @@ def test_s3_backend_roundtrip():
     from app.ai_features.resumes.storage.s3 import S3Storage
 
     with moto.mock_aws():
-        boto3.client("s3", region_name="us-east-1").create_bucket(
-            Bucket="resume-test-bucket"
-        )
+        boto3.client("s3", region_name="us-east-1").create_bucket(Bucket="resume-test-bucket")
         cfg = ResumeSettings(
             storage_backend="s3",
             s3_bucket="resume-test-bucket",
@@ -52,9 +50,7 @@ def test_s3_backend_roundtrip():
         )
         s = S3Storage(cfg)
         s.put("c/j/r/original.pdf", b"hello", content_type="application/pdf")
-        assert (
-            s.exists("c/j/r/original.pdf") and s.get("c/j/r/original.pdf") == b"hello"
-        )
+        assert s.exists("c/j/r/original.pdf") and s.get("c/j/r/original.pdf") == b"hello"
         assert not s.exists("nope")
         with pytest.raises(StorageObjectMissing):
             s.get("nope")
