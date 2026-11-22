@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invalidateAll } from '$app/navigation';
   import { registerUserAsAdmin } from '$lib/services/auth';
   import {
     getCompany,
@@ -77,7 +78,7 @@
     e.preventDefault();
     return run(async () => {
       await (st === 'none' ? createCompany(f) : updateCompany(f));
-      await load();
+      await Promise.all([load(), invalidateAll()]);
     }, st === 'none' ? 'Company created.' : 'Company profile saved.');
   };
 

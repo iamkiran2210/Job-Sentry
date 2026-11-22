@@ -35,8 +35,8 @@
       pending = true;
       try {
         const data = form.data as LoginForm;
-        await login(data.email.trim(), data.password);
-        await goto('/dashboard');
+        const user = await login(data.email.trim(), data.password);
+        await goto(user?.company_id ? '/dashboard' : '/company');
       } catch (err) {
         toastError(err, 'Sign-in failed');
       } finally {
@@ -51,8 +51,8 @@
     if (pending) return;
     pending = true;
     try {
-      await loginWithGoogle(token);
-      await goto('/dashboard');
+      const user = await loginWithGoogle(token);
+      await goto(user?.company_id ? '/dashboard' : '/company');
     } catch (err) {
       toastError(err, 'Google sign-in failed');
     } finally {

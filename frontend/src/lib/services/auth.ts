@@ -49,17 +49,26 @@ export function setSessionCache(user: User, hasCompany: boolean) {
   sessionCache = { user, hasCompany, ts: Date.now() };
 }
 
-export async function login(email: string, password: string): Promise<void> {
+function disableGoogleAutoSelect() {
+  try {
+    const g = (window as unknown as { google?: { accounts?: { id?: { disableAutoSelect?: () => void } } } }).google;
+    g?.accounts?.id?.disableAutoSelect?.();
+  } catch {
+    /* ignore if GIS not loaded */
+  }
+}
+
+export async function login(email: string, password: string): Promise<User> {
   invalidateSessionCache();
   const res = await api<unknown>('/auth/login', { method: 'POST', auth: false, body: JSON.stringify({ email, password }) });
   const t = extractTokens(res);
   tokens.set(t.access_token, t.refresh_token);
-  await verifySession();
+  return await verifySession();
 }
 
 /** Confirms the new token works, so a failure is attributed to the right step. */
-async function verifySession(): Promise<void> {
-  try { await getMe(); }
+async function verifySession(): Promise<User> {
+  try { return await getMe(); }
   catch (e) { tokens.clear(); throw new ApiError(401, `Signed in, but the token was rejected by /auth/me. ${e instanceof Error ? e.message : ''}`); }
 }
 
@@ -67,12 +76,23 @@ export const getMe = () => api<User>('/auth/me');
 
 export async function logout(): Promise<void> {
   invalidateSessionCache();
+  disableGoogleAutoSelect();
   const refresh_token = tokens.refresh();
   try {
     if (refresh_token) await api('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) });
   } finally {
     tokens.clear();
+    try { sessionStorage.clear(); } catch { /* ignore */ }
   }
+}
+
+export async function deleteAccount(): Promise<Record<string, unknown>> {
+  const res = await api<Record<string, unknown>>('/users/me', { method: 'DELETE' });
+  invalidateSessionCache();
+  disableGoogleAutoSelect();
+  tokens.clear();
+  try { sessionStorage.clear(); } catch { /* ignore */ }
+  return res;
 }
 
 export const register = (name: string, email: string, password: string) =>
@@ -82,18 +102,18 @@ export const register = (name: string, email: string, password: string) =>
  * Google. `/auth/google` is for existing users; `/auth/sign/google` registers new recruiters (per the API reference).
  * The login button tries the first and falls back to the second when the account is not recognised.
  */
-async function googleAuth(path: '/auth/google' | '/auth/sign/google', id_token: string) {
+async function googleAuth(path: '/auth/google' | '/auth/sign/google', id_token: string): Promise<User> {
   invalidateSessionCache();
   const res = await api<unknown>(path, { method: 'POST', auth: false, body: JSON.stringify({ id_token }) });
   const t = extractTokens(res);
   tokens.set(t.access_token, t.refresh_token);
-  await verifySession();
+  return await verifySession();
 }
-export async function loginWithGoogle(id_token: string): Promise<void> {
-  try { await googleAuth('/auth/google', id_token); }
-  catch (e) { if (e instanceof ApiError && [401, 403, 404, 409, 422].includes(e.status)) await googleAuth('/auth/sign/google', id_token); else throw e; }
+export async function loginWithGoogle(id_token: string): Promise<User> {
+  try { return await googleAuth('/auth/google', id_token); }
+  catch (e) { if (e instanceof ApiError && [401, 403, 404, 409, 422].includes(e.status)) return await googleAuth('/auth/sign/google', id_token); else throw e; }
 }
-export const signUpWithGoogle = (id_token: string) => googleAuth('/auth/sign/google', id_token);
+export const signUpWithGoogle = (id_token: string): Promise<User> => googleAuth('/auth/sign/google', id_token);
 
 /** Admin-only: create another user. Backend enforces the role. */
 export const registerUserAsAdmin = (name: string, email: string, password: string) =>
@@ -101,5 +121,5 @@ export const registerUserAsAdmin = (name: string, email: string, password: strin
 
 export const getAccess = () => api<Record<string, unknown>>('/users/me/access');
 
-export const adminCheck = () => api<{ is_admin: boolean; verified_at?: string }>('/users/admin/check');
+export const adminCheck = () => api<{ is_admin?: boolean; role?: string; verified_at?: string }>('/users/admin/check');
 export const getProfile = () => api<Partial<User>>('/users/me');

@@ -44,6 +44,28 @@ async def get_my_access(
     )
 
 
+@router.delete(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    summary="Delete current user account",
+    description=(
+            "Permanently deletes the authenticated user's account, tokens, and access grants. "
+            "If the user is the sole remaining member of their company, also deletes the entire "
+            "company workspace (jobs, candidates, resumes, scores, and history)."
+    ),
+)
+async def delete_current_user_account(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+):
+    result = await UsersService.delete_my_account(db, current_user)
+    return success_response(
+        data=result,
+        message="Account deleted permanently",
+        status_code=status.HTTP_200_OK,
+    )
+
+
 @router.get(
     "/admin/check",
     status_code=status.HTTP_200_OK,
@@ -54,7 +76,11 @@ async def check_admin_access(
     admin_user: User = Depends(require_role(UserRole.ADMIN)),
 ):
     return success_response(
-        data={"user_id": str(admin_user.id), "role": admin_user.role.value},
+        data={
+            "user_id": str(admin_user.id),
+            "role": admin_user.role.value,
+            "is_admin": True,
+        },
         message="Admin access granted",
         status_code=status.HTTP_200_OK,
     )

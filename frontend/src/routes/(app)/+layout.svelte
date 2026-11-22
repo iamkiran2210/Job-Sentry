@@ -91,7 +91,7 @@
 
   async function signOut() {
     await logout();
-    await goto('/login');
+    await goto('/login', { replaceState: true, invalidateAll: true });
   }
 </script>
 

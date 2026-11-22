@@ -17,9 +17,15 @@
   import { z } from 'zod';
 
   const registerSchema = z.object({
-    name: z.string().min(2, 'Name must be at least 2 characters'),
-    email: z.string().email('Please enter a valid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters')
+    name: z.string().trim().min(2, 'Name must be at least 2 characters'),
+    email: z.string().trim().email('Please enter a valid email address'),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Include at least one uppercase letter')
+      .regex(/[a-z]/, 'Include at least one lowercase letter')
+      .regex(/\d/, 'Include at least one number')
+      .regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Include at least one special character')
   });
 
   type RegisterForm = z.infer<typeof registerSchema>;
@@ -53,8 +59,8 @@
     if (pending) return;
     pending = true;
     try {
-      await signUpWithGoogle(token);
-      await goto('/company');
+      const user = await signUpWithGoogle(token);
+      await goto(user?.company_id ? '/dashboard' : '/company');
     } catch (err) {
       toastError(err, 'Google sign-up failed');
     } finally {
@@ -167,6 +173,9 @@
               </div>
             {/snippet}
           </Form.Control>
+          <p class="text-[11px] text-muted-foreground">
+            Must be 8+ characters with uppercase, lowercase, number, and special character.
+          </p>
           <Form.FieldErrors class="text-xs text-destructive" />
         </Form.Field>
 

@@ -116,12 +116,19 @@ def decode_token(token: str) -> Dict[str, Any]:
 def verify_google_id_token(token: str) -> Dict[str, Any]:
     """
     Verify Google ID token using Google's official library.
-    Validates audience, issuer, and expiration.
+    Validates audience, issuer, and expiration with clock-skew tolerance.
     """
+    if not token or not token.strip():
+        raise UnauthorizedException("Google ID token is required")
     try:
         request = google_requests.Request()
-        audience = settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None
-        id_info = id_token.verify_oauth2_token(token, request, audience=audience)
+        audience = settings.GOOGLE_CLIENT_ID.strip() if settings.GOOGLE_CLIENT_ID else None
+        id_info = id_token.verify_oauth2_token(
+            token.strip(),
+            request,
+            audience=audience,
+            clock_skew_in_seconds=60,
+        )
         issuer = id_info.get("iss")
         if issuer not in ["accounts.google.com", "https://accounts.google.com"]:
             raise UnauthorizedException("Invalid Google token issuer")
@@ -130,11 +137,16 @@ def verify_google_id_token(token: str) -> Dict[str, Any]:
     except UnauthorizedException:
         raise
     except (ValueError, GoogleAuthError) as exc:
-        logger.info("Google ID token rejected", extra={"error_type": type(exc).__name__})
+        logger.warning(
+            "Google ID token rejected: %s (%s)",
+            type(exc).__name__,
+            str(exc)[:200],
+        )
         raise UnauthorizedException("Could not validate Google credentials") from exc
     except Exception as exc:
         logger.warning(
-            "Google ID token verification failed",
-            extra={"error_type": type(exc).__name__},
+            "Google ID token verification failed: %s (%s)",
+            type(exc).__name__,
+            str(exc)[:200],
         )
         raise UnauthorizedException("Could not validate Google credentials") from exc

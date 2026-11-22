@@ -369,3 +369,59 @@ async def test_google_link_cannot_issue_tokens_for_another_account(
         )
     assert response.status_code == 403
     assert "someone-else@example.com" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_registers_new_user_and_handles_short_name(client: AsyncClient):
+    """POST /auth/sign/google creates a verified Google user even when display name is missing/1-char."""
+    mock_google_payload = {
+        "email": "fresh.google@example.com",
+        "name": "K",
+        "email_verified": True,
+        "iss": "https://accounts.google.com",
+        "sub": "google-sub-999",
+    }
+    with patch(
+            "app.modules.auth.service.verify_google_id_token",
+            return_value=mock_google_payload,
+    ):
+        response = await client.post(
+            "/api/v1/auth/sign/google",
+            json={"id_token": "valid-google-id-token"},
+        )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["user"]["email"] == "fresh.google@example.com"
+    assert data["user"]["name"] == "fresh.google"
+    assert data["user"]["auth_provider"] == "google"
+    assert data["user"]["is_verified"] is True
+    assert data["access_token"]
+    assert data["refresh_token"]
+
+    # Signing in a second time returns fresh tokens for the existing account
+    with patch(
+            "app.modules.auth.service.verify_google_id_token",
+            return_value=mock_google_payload,
+    ):
+        second = await client.post(
+            "/api/v1/auth/sign/google",
+            json={"id_token": "valid-google-id-token"},
+        )
+    assert second.status_code == 200
+    assert second.json()["data"]["user"]["id"] == data["user"]["id"]
+
+
+def test_verify_google_id_token_passes_clock_skew():
+    """verify_google_id_token passes clock_skew_in_seconds to tolerate host/Docker clock drift."""
+    from app.core.security import verify_google_id_token
+
+    with patch("app.core.security.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "skew@example.com",
+            "email_verified": True,
+            "iss": "https://accounts.google.com",
+        }
+        info = verify_google_id_token("fake-jwt-token")
+    assert info["email"] == "skew@example.com"
+    _, kwargs = mock_verify.call_args
+    assert kwargs["clock_skew_in_seconds"] == 60

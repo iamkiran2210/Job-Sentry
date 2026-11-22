@@ -10,7 +10,12 @@ export function explain(e: unknown): { title: string; detail?: string } {
     : '';
   switch (e.status) {
     case 0: return { title: 'Cannot reach the server', detail: 'Check your connection and that the backend is running.' };
-    case 401: return { title: 'Your session has ended', detail: 'Please sign in again.' };
+    case 401: {
+      const isSession = !backend || /expired|revoked|bearer|not authenticated|session/i.test(backend);
+      return isSession
+        ? { title: 'Your session has ended', detail: 'Please sign in again.' }
+        : { title: 'Authentication failed', detail: backend };
+    }
     case 403: return { title: 'You do not have permission', detail: backend || 'Ask a company admin for access.' };
     case 404: return { title: 'Not found', detail: backend || 'It may have been deleted or moved.' };
     case 409: return { title: 'Conflict', detail: backend || 'This was changed elsewhere. Refresh and try again.' };
