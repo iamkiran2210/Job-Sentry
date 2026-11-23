@@ -2,9 +2,11 @@
   import { page } from '$app/state';
   import { onDestroy } from 'svelte';
   import { getResume, uploadResume, resumeIdFrom, resumeStatus, retryResume, deleteResume } from '$lib/services/resumes';
+  import { getJob } from '$lib/services/jobs';
   import { ApiError } from '$lib/services/api-client';
   import { toast } from '$lib/stores/toast.svelte';
   import { confirmDialog } from '$lib/stores/confirm.svelte';
+  import { pipelineProgress } from '$lib/stores/pipeline-progress.svelte';
   import { toastError } from '$lib/errors';
   import { runRanking } from '$lib/services/applications';
   import { fmtBytes, humanize } from '$lib/utils';
@@ -49,6 +51,8 @@
     deleting?: boolean;
   };
 
+  let jobTitle = $state('');
+  let activeTaskId = $state<string | null>(null);
   let items = $state<Item[]>([]);
   let rejected = $state<string[]>([]);
   let autoRank = $state(true);
@@ -56,6 +60,60 @@
   let ranking = $state(false);
   const timers = new Set<ReturnType<typeof setInterval>>();
   onDestroy(() => timers.forEach(clearInterval));
+
+  getJob(id)
+    .then((j) => (jobTitle = j.title))
+    .catch(() => {});
+
+  const resolvedJobName = () => jobTitle || 'Selected job';
+
+  function ensureUploadTask(totalCount: number) {
+    if (!activeTaskId) {
+      activeTaskId = pipelineProgress.start({
+        jobId: id,
+        jobName: resolvedJobName(),
+        kind: 'upload_and_rank',
+        stage: 'uploading',
+        detail: `Uploading ${totalCount} resume${totalCount === 1 ? '' : 's'}…`,
+        progress: 10,
+        totalFiles: totalCount,
+        autoRank
+      });
+    }
+    return activeTaskId;
+  }
+
+  function syncUploadProgress() {
+    if (!activeTaskId || items.length === 0) return;
+    const total = items.length;
+    const done = items.filter((i) => i.phase === 'done').length;
+    const failed = items.filter((i) => i.phase === 'failed').length;
+    const uploading = items.filter((i) => i.phase === 'uploading').length;
+    const processing = items.filter((i) => i.phase === 'processing').length;
+    if (uploading > 0) {
+      const avgUpload =
+        items.reduce((s, i) => s + (i.phase === 'uploading' ? i.progress : i.phase === 'queued' ? 0 : 100), 0) /
+        total;
+      pipelineProgress.transition(
+        activeTaskId,
+        'uploading',
+        `Uploading resumes (${total - uploading}/${total} uploaded)…`,
+        Math.round(8 + avgUpload * 0.22),
+        { doneFiles: done, totalFiles: total }
+      );
+    } else if (processing > 0) {
+      pipelineProgress.transition(
+        activeTaskId,
+        'analyzing',
+        `Analyzing resumes (${done}/${total} analyzed)…`,
+        Math.round(32 + (done / total) * 28),
+        { doneFiles: done, totalFiles: total }
+      );
+    } else if (done === 0 && failed === total) {
+      pipelineProgress.fail(activeTaskId, `All ${failed} resume upload(s) failed.`);
+      activeTaskId = null;
+    }
+  }
 
   function add(files: FileList | File[]) {
     rejected = [];
@@ -85,9 +143,11 @@
         if (st === 'completed') {
           it.phase = 'done';
           clearInterval(t);
+          syncUploadProgress();
         } else if (st === 'failed') {
           it.phase = 'failed';
           clearInterval(t);
+          syncUploadProgress();
         }
       } catch {
         /* keep polling */
@@ -97,20 +157,37 @@
   }
 
   async function send(it: Item) {
+    const taskId = ensureUploadTask(items.length);
     it.phase = 'uploading';
     it.progress = 0;
     it.note = undefined;
     try {
-      const res = await uploadResume(id, it.file, (p) => (it.progress = p));
+      const res = await uploadResume(id, it.file, (p) => {
+        it.progress = p;
+        syncUploadProgress();
+      });
       it.resumeId = resumeIdFrom(res) ?? undefined;
       it.phase = 'processing';
-      it.note = 'Uploaded, processing resume parsing';
-      if (it.resumeId) poll(it);
-      else it.note = 'Uploaded. Backend did not return a resume identifier.';
+      it.note = 'Uploaded — extracting and analyzing resume…';
+      toast.info(`${resolvedJobName()} · Uploaded`, `${it.file.name} uploaded. Analyzing resume…`);
+      if (it.resumeId) {
+        // Hand off to global store so analysis + auto-ranking survive page refresh and navigation!
+        pipelineProgress.attachUploadedResume(taskId, it.resumeId, {
+          fileName: it.file.name,
+          totalFiles: items.length,
+          autoRank
+        });
+        poll(it);
+      } else {
+        it.note = 'Uploaded. Backend did not return a resume identifier.';
+      }
+      syncUploadProgress();
     } catch (e) {
+      if (e instanceof ApiError && e.isPageUnload) return;
       it.phase = 'failed';
       it.note = e instanceof ApiError ? e.message : 'Upload failed';
       toastError(e, `Could not upload ${it.file.name}`);
+      syncUploadProgress();
     }
   }
 
@@ -119,23 +196,46 @@
   );
   const anyDone = $derived(items.some((i) => i.phase === 'done'));
 
+  // Sync local `ranked` badge when the global pipeline finishes auto-ranking for this job
+  $effect(() => {
+    if (pipelineProgress.lastCompleted?.jobId === id && pipelineProgress.lastCompleted.kind === 'upload_and_rank') {
+      if (autoRank) ranked = true;
+      activeTaskId = null;
+    }
+  });
+
   async function rankNow() {
     if (ranking) return;
     ranking = true;
+    const taskId = pipelineProgress.start({
+      jobId: id,
+      jobName: resolvedJobName(),
+      kind: 'rank',
+      stage: 'verifying',
+      detail: 'Verifying profiles and ranking new applicants…',
+      progress: 40
+    });
+    pipelineProgress.simulateRankingPhases(taskId, { includesVerify: true, isRerun: false });
     try {
-      await runRanking(id);
+      const res = await runRanking(id);
       ranked = true;
-      toast.success('Ranking updated', 'Applicant scores now include all processed resumes.');
+      const verified = typeof res?.verified_count === 'number' ? res.verified_count : 0;
+      if (verified > 0) {
+        toast.info(`${resolvedJobName()} · Verified`, `Completed verification checks for ${verified} applicant(s).`);
+      }
+      pipelineProgress.complete(
+        taskId,
+        `All processed resumes are now ranked${verified > 0 ? ` (${verified} verified)` : ''}.`,
+        { title: `Ranking complete · ${resolvedJobName()}`, verifiedCount: verified, showViewAction: true }
+      );
     } catch (e) {
-      toastError(e, 'Ranking failed');
+      if (e instanceof ApiError && e.isPageUnload) return;
+      const detail = e instanceof ApiError ? e.message : 'Ranking failed';
+      pipelineProgress.fail(taskId, detail, `${resolvedJobName()} · Ranking failed`);
     } finally {
       ranking = false;
     }
   }
-
-  $effect(() => {
-    if (finished && anyDone && autoRank && !ranked && !ranking) rankNow();
-  });
 
   async function showExtracted(it: Item) {
     it.open = !it.open;
@@ -191,9 +291,29 @@
   <div class="space-y-1">
     <h1 class="text-3xl font-bold tracking-tight text-foreground">Upload Resumes</h1>
     <p class="text-sm text-muted-foreground">
-      Upload candidate CVs to extract structured background data and run algorithmic evaluation.
+      {jobTitle ? `Adding candidates to ${jobTitle} · ` : ''}Upload CVs to extract structured profiles, verify links, and rank applicants automatically.
     </p>
   </div>
+
+  <!-- Clear 4-step workflow guide -->
+  <ol class="grid gap-2.5 sm:grid-cols-4 text-xs">
+    {#each [
+      ['1', 'Upload CVs', 'PDF, DOCX, JPG or PNG up to 10 MB'],
+      ['2', 'AI Analysis', 'Extracts skills, experience & education'],
+      ['3', 'Verification', 'Checks email MX, authenticity & links'],
+      ['4', 'Rank & Notify', 'Scores candidates — persists across refresh']
+    ] as [num, title, desc]}
+      <li class="flex items-start gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-2xs">
+        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+          {num}
+        </span>
+        <div class="min-w-0">
+          <div class="font-semibold text-foreground">{title}</div>
+          <div class="text-[11px] text-muted-foreground leading-snug">{desc}</div>
+        </div>
+      </li>
+    {/each}
+  </ol>
 
   <ResumeDropzone onFiles={add} class="w-full" />
 

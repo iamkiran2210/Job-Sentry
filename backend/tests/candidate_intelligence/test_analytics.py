@@ -423,3 +423,45 @@ async def test_deleted_candidates_applications_and_jobs_excluded_from_kpis(
     assert all(item["id"] != str(job_b.id) for item in jobs3["items"])
     skills3 = (await client.get("/api/v1/analytics/skills", headers=admin_headers)).json()["data"]
     assert skills3["top_candidate_skills"] == []
+
+
+@pytest.mark.asyncio
+async def test_weekly_trend_includes_final_partial_week_bucket(
+    client, db_session, company_with_admin, admin_headers
+):
+    """Weekly trend must include the end-date's week even when end.weekday() < start.weekday()."""
+    from datetime import date
+
+    company, _ = company_with_admin
+    job = Job(
+        company_id=company.id,
+        title="Trend Test Role",
+        description="Test weekly trend",
+        employment_type=EmploymentType.FULL_TIME,
+        work_mode=WorkMode.REMOTE,
+        status=JobStatus.ACTIVE,
+    )
+    db_session.add(job)
+    await db_session.flush()
+
+    # 2026-11-23 is a Monday; 89 days earlier is 2026-08-26 (Wednesday).
+    # Previously, advancing +7 from Wednesday skipped Monday 2026-11-23!
+    end_d = date(2026, 11, 23)
+    start_d = end_d - timedelta(days=89)
+    app_on_end = Application(
+        company_id=company.id,
+        job_id=job.id,
+        status="applied",
+        created_at=datetime(2026, 11, 23, 10, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(app_on_end)
+    await db_session.commit()
+
+    resp = await client.get(
+        f"/api/v1/analytics/overview?date_from={start_d.isoformat()}&date_to={end_d.isoformat()}&interval=week",
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    items = resp.json()["data"]["trend"]["items"]
+    assert items[-1] == {"bucket": "2026-11-23", "applications": 1}
+    assert sum(i["applications"] for i in items) == 1

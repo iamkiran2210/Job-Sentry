@@ -39,33 +39,101 @@ _MONTHS = {
     "dec": "12",
     "december": "12",
 }
-_MON_YEAR_RE = re.compile(r"^([A-Za-z]{3,9})\.?\s*,?\s*((?:19|20)\d{2})$")
+_MON_YEAR_RE = re.compile(
+    r"^([A-Za-z]{3,9})\.?\s*(?:[,/\-]\s*)?((?:19|20)\d{2}|'\d{2})$"
+)
+_YEAR_MON_NAME_RE = re.compile(r"^((?:19|20)\d{2})\s*[,/\-\s]\s*([A-Za-z]{3,9})\.?$")
 _YEAR_MON_RE = re.compile(r"^((?:19|20)\d{2})\s*[-/]\s*(\d{1,2})(?:\s*[-/]\s*(\d{1,2}))?$")
 _SLASH_MY_RE = re.compile(r"^(\d{1,2})\s*[-/]\s*((?:19|20)\d{2})$")
+_CURRENT_MARKERS = frozenset(
+    {"present", "current", "now", "ongoing", "pursuing", "till date", "to date", "active"}
+)
+_DATE_PREFIX_RE = re.compile(
+    r"^(?:expected|est\.?|estimated|graduating|anticipated|since|from)\s+", re.I
+)
+_LEADING_GLYPH_RE = re.compile(r"^(?:</>|[•·▪●▸➢❖✓✔➤►→–—\-|&€©®⟟]+\s+)+")
+_TRAILING_JUNK_RE = re.compile(r"[\s,;|•·–—]+$")
+_SKILL_PROFICIENCY_RE = re.compile(
+    r"\s*(?:[-–—:|(]\s*)?(?:expert|export|advanced|intermediate|beginner|proficient|highly proficient|native speaker|fluent|basic)\)?$",
+    re.I,
+)
 
 
 def _trim(n: int):
     def f(v: Any):
         if v is None or isinstance(v, (dict, list)):
             return None
-        s = str(v).strip()
+        s = re.sub(r"\s+", " ", str(v)).strip()
         return s[:n] if s else None
 
     return f
 
 
+def _clean_entity(n: int):
+    def f(v: Any):
+        if v is None or isinstance(v, (dict, list)):
+            return None
+        s = re.sub(r"\s+", " ", str(v)).strip()
+        s = _LEADING_GLYPH_RE.sub("", s).strip()
+        s = _TRAILING_JUNK_RE.sub("", s).strip()
+        return s[:n] if s else None
+
+    return f
+
+
+def _clean_skill_name(v: Any):
+    if v is None or isinstance(v, (dict, list)):
+        return None
+    s = re.sub(r"\s+", " ", str(v)).strip()
+    s = _LEADING_GLYPH_RE.sub("", s).strip()
+    s = _SKILL_PROFICIENCY_RE.sub("", s).strip()
+    s = _TRAILING_JUNK_RE.sub("", s).strip()
+    # Reject empty, purely numeric, or full-sentence action bullets masquerading as skills
+    if not s or re.fullmatch(r"[\d\W_]+", s) or len(s.split()) > 6:
+        return None
+    return s[:100]
+
+
+def _normalize_url_value(v: str | None) -> str | None:
+    if not v:
+        return None
+    s = v.strip().strip("<>()[]\"'.,;")
+    if not s or " " in s:
+        return None
+    low = s.casefold()
+    if low.startswith(("http://", "https://")):
+        return s[:300]
+    if low.startswith(("www.", "linkedin.com/", "github.com/")) or re.match(
+        r"^[a-z0-9][a-z0-9.-]+\.[a-z]{2,}(?:/\S*)?$", low
+    ):
+        return f"https://{s}"[:300]
+    return s[:300]
+
+
+def _expand_two_digit_year(raw_year: str) -> str:
+    if raw_year.startswith("'") and len(raw_year) == 3 and raw_year[1:].isdigit():
+        yy = int(raw_year[1:])
+        return f"{1900 + yy if yy >= 50 else 2000 + yy}"
+    return raw_year
+
+
 def _date(v: Any):
     if v is None:
         return None
-    s = str(v).strip()
-    if not s or s.casefold() in {"present", "current", "now", "ongoing", "pursuing", "till date"}:
+    s = re.sub(r"\s+", " ", str(v)).strip()
+    s = _DATE_PREFIX_RE.sub("", s).strip()
+    if not s or s.casefold() in _CURRENT_MARKERS:
         return None
     if _DATE_RE.match(s):
         return s
     if m := _MON_YEAR_RE.match(s):
         mon = _MONTHS.get(m.group(1).casefold())
         if mon:
-            return f"{m.group(2)}-{mon}"
+            return f"{_expand_two_digit_year(m.group(2))}-{mon}"
+    if m := _YEAR_MON_NAME_RE.match(s):
+        mon = _MONTHS.get(m.group(2).casefold())
+        if mon:
+            return f"{m.group(1)}-{mon}"
     if m := _YEAR_MON_RE.match(s):
         y, mo, d = m.group(1), int(m.group(2)), int(m.group(3)) if m.group(3) else None
         if 1 <= mo <= 12:
@@ -99,8 +167,15 @@ Str300 = Annotated[str | None, BeforeValidator(_trim(300))]
 Str400 = Annotated[str | None, BeforeValidator(_trim(400))]
 Str1000 = Annotated[str | None, BeforeValidator(_trim(1000))]
 Str2000 = Annotated[str | None, BeforeValidator(_trim(2000))]
+Entity200 = Annotated[str | None, BeforeValidator(_clean_entity(200))]
+Entity300 = Annotated[str | None, BeforeValidator(_clean_entity(300))]
+SkillName = Annotated[str | None, BeforeValidator(_clean_skill_name)]
 PartialDate = Annotated[str | None, BeforeValidator(_date)]  # YYYY | YYYY-MM | YYYY-MM-DD
 Confidence = Annotated[float | None, BeforeValidator(_conf)]
+
+
+def _skill_dedup_key(name: str) -> str:
+    return re.sub(r"[\s\-_.]+", "", name.casefold())
 
 
 class _Base(BaseModel):
@@ -135,7 +210,7 @@ class ContactDetails(_Base):
 
 
 class Skill(_Base):
-    name: Str100 = None
+    name: SkillName = None
     category: Str100 = None
     confidence: Confidence = None
     evidence: Str400 = None
@@ -147,9 +222,9 @@ class Skill(_Base):
 
 
 class Employment(_Base):
-    company: Str200 = None
-    title: Str200 = None
-    location: Str200 = None
+    company: Entity200 = None
+    title: Entity200 = None
+    location: Entity200 = None
     start_date: PartialDate = None
     end_date: PartialDate = None
     is_current: bool | None = None
@@ -162,6 +237,19 @@ class Employment(_Base):
     ] = []
     confidence: Confidence = None
     evidence: Str400 = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _infer_is_current(cls, v):
+        if isinstance(v, dict):
+            raw_end = v.get("end_date")
+            if (
+                v.get("is_current") is None
+                and isinstance(raw_end, str)
+                and raw_end.strip().casefold() in _CURRENT_MARKERS
+            ):
+                v = {**v, "is_current": True}
+        return v
 
 
 class ExperienceClaim(_Base):
@@ -180,9 +268,9 @@ class ExperienceClaim(_Base):
 
 
 class Education(_Base):
-    institution: Str200 = None
-    degree: Str200 = None
-    field_of_study: Str200 = None
+    institution: Entity200 = None
+    degree: Entity200 = None
+    field_of_study: Entity200 = None
     start_date: PartialDate = None
     end_date: PartialDate = None
     grade: Str100 = None
@@ -191,8 +279,8 @@ class Education(_Base):
 
 
 class Certification(_Base):
-    name: Str200 = None
-    issuer: Str200 = None
+    name: Entity200 = None
+    issuer: Entity200 = None
     issue_date: PartialDate = None
     expiry_date: PartialDate = None
     credential_id: Str100 = None
@@ -201,9 +289,9 @@ class Certification(_Base):
 
 
 class Project(_Base):
-    name: Str200 = None
+    name: Entity200 = None
     description: Str1000 = None
-    role: Str200 = None
+    role: Entity200 = None
     url: Str300 = None
     technologies: Annotated[
         list[str],
@@ -233,10 +321,14 @@ class ExtractedProfileData(_Base):
 
     @model_validator(mode="after")
     def _drop_empty_items(self):
+        if self.full_name.value:
+            self.full_name.value = _clean_entity(300)(self.full_name.value)
+        if self.contact.location.value:
+            self.contact.location.value = _clean_entity(300)(self.contact.location.value)
         seen: set[str] = set()
         skills = []
         for s in self.skills:
-            k = (s.name or "").casefold()
+            k = _skill_dedup_key(s.name) if s.name else ""
             if k and k not in seen:
                 seen.add(k)
                 skills.append(s)

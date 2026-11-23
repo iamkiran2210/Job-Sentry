@@ -31,7 +31,7 @@ def use_model(monkeypatch, fn):
     async def async_fn(messages, info):
         return fn(messages, info)
 
-    monkeypatch.setattr(engine_mod, "build_model", lambda settings, task: FunctionModel(async_fn))
+    monkeypatch.setattr(engine_mod, "build_model", lambda settings, task, **_: FunctionModel(async_fn))
 
 
 def tool_call(info: AgentInfo, args):
@@ -154,7 +154,7 @@ async def test_fallback_model_used_when_primary_fails(monkeypatch):
     monkeypatch.setattr(
         engine_mod,
         "build_model",
-        lambda s, t: FallbackModel(FunctionModel(bad), FunctionModel(good)),
+        lambda s, t, **_: FallbackModel(FunctionModel(bad), FunctionModel(good)),
     )
     run = await StructuredExtractor(RESUME_TASK, S()).run("Jane Doe")
     assert run.output.full_name.value == "Jane Doe"

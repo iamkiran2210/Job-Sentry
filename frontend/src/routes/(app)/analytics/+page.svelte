@@ -37,12 +37,27 @@
     ['created_at', 'Date created']
   ] as const;
 
+  function localIsoDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function isoDaysAgo(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return localIsoDate(d);
+  }
+
+  const todayIso = localIsoDate(new Date());
+
   let tab = $state<Tab>('overview');
-  let preset = $state<'30d' | '90d' | 'custom'>('90d');
-  let from = $state('');
-  let to = $state('');
+  let preset = $state<'7d' | '30d' | '90d' | 'custom'>('30d');
+  let from = $state(isoDaysAgo(29));
+  let to = $state(todayIso);
   let jobId = $state('all');
-  let interval = $state<'day' | 'week' | 'month'>('week');
+  let interval = $state<'day' | 'week' | 'month'>('day');
   let sortField = $state('applications');
   let sortDir = $state<'asc' | 'desc'>('desc');
   let pg = $state(1);
@@ -50,48 +65,57 @@
   let jobs = $state<Job[]>([]);
   let data = $state<unknown>(null);
   let st = $state<'loading' | 'ready' | 'error'>('loading');
+  let loadSeq = 0;
 
   listJobs()
     .then((j) => (jobs = j))
     .catch(() => {});
 
-  function isoDaysAgo(days: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+  function applyPreset(p: '7d' | '30d' | '90d') {
+    preset = p;
+    const now = localIsoDate(new Date());
+    to = now;
+    if (p === '7d') {
+      from = isoDaysAgo(6);
+      interval = 'day';
+    } else if (p === '30d') {
+      from = isoDaysAgo(29);
+      interval = 'day';
+    } else {
+      from = isoDaysAgo(89);
+      interval = 'week';
+    }
+    pg = 1;
+    load();
   }
 
-  function applyPreset(p: '30d' | '90d') {
-    preset = p;
-    if (p === '30d') {
-      from = isoDaysAgo(29);
-      to = new Date().toISOString().slice(0, 10);
-    } else {
-      from = '';
-      to = '';
+  function onDateChange(which: 'from' | 'to', value: string) {
+    if (which === 'from') from = value;
+    else to = value;
+    preset = 'custom';
+    // Prevent invalid inverted ranges (start > end) before hitting the API
+    if (from && to && from > to) {
+      if (which === 'from') to = from;
+      else from = to;
     }
     pg = 1;
     load();
   }
 
   const hasCustomFilters = $derived(
-    from !== '' || to !== '' || jobId !== 'all' || (tab === 'overview' && interval !== 'week')
+    preset !== '30d' || jobId !== 'all' || (tab === 'overview' && interval !== 'day')
   );
 
   function resetFilters() {
-    preset = '90d';
-    from = '';
-    to = '';
     jobId = 'all';
-    interval = 'week';
-    pg = 1;
-    load();
+    applyPreset('30d');
   }
 
   async function load() {
+    const seq = ++loadSeq;
     st = 'loading';
     try {
-      data = await getAnalytics(tab, {
+      const result = await getAnalytics(tab, {
         from: from || undefined,
         to: to || undefined,
         jobId: jobId === 'all' ? undefined : jobId,
@@ -100,8 +124,11 @@
         sort: `${sortField}:${sortDir}`,
         limit: Number(limit) || 10
       });
+      if (seq !== loadSeq) return;
+      data = result;
       st = 'ready';
     } catch (e) {
+      if (seq !== loadSeq) return;
       st = 'error';
       toastError(e, 'Could not load analytics');
     }
@@ -264,24 +291,17 @@
         <!-- Date Range Presets + Inputs -->
         <div class="flex flex-wrap items-center gap-2">
           <div class="inline-flex items-center rounded-lg border border-border bg-muted/30 p-0.5">
-            <button
-              type="button"
-              onclick={() => applyPreset('30d')}
-              class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                preset === '30d' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              30d
-            </button>
-            <button
-              type="button"
-              onclick={() => applyPreset('90d')}
-              class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                preset === '90d' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              90d
-            </button>
+            {#each (['7d', '30d', '90d'] as const) as p}
+              <button
+                type="button"
+                onclick={() => applyPreset(p)}
+                class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                  preset === p ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {p}
+              </button>
+            {/each}
           </div>
 
           <div class="flex items-center gap-1.5">
@@ -289,26 +309,21 @@
               id="from-date"
               aria-label="From date"
               type="date"
-              bind:value={from}
-              onchange={() => {
-                preset = 'custom';
-                pg = 1;
-                load();
-              }}
-              class="h-8 w-[132px] text-xs"
+              max={to || todayIso}
+              value={from}
+              onchange={(e) => onDateChange('from', (e.currentTarget as HTMLInputElement).value)}
+              class="h-8 w-[136px] text-xs"
             />
             <span class="text-xs text-muted-foreground">–</span>
             <Input
               id="to-date"
               aria-label="To date"
               type="date"
-              bind:value={to}
-              onchange={() => {
-                preset = 'custom';
-                pg = 1;
-                load();
-              }}
-              class="h-8 w-[132px] text-xs"
+              min={from || undefined}
+              max={todayIso}
+              value={to}
+              onchange={(e) => onDateChange('to', (e.currentTarget as HTMLInputElement).value)}
+              class="h-8 w-[136px] text-xs"
             />
           </div>
         </div>

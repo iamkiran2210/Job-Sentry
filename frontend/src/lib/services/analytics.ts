@@ -4,7 +4,8 @@ export const TABS = ['overview', 'jobs', 'candidates', 'skills', 'pipeline'] as 
 export type Tab = (typeof TABS)[number];
 export interface AnalyticsQuery { from?: string; to?: string; jobId?: string; interval?: 'day' | 'week' | 'month'; page?: number; pageSize?: number; sort?: string; limit?: number }
 // Free-form objects in OpenAPI, so keep them loose and render what is returned.
-export const getOverview = () => api<Record<string, unknown>>('/analytics/overview');
+export const getOverview = (q: AnalyticsQuery = {}) =>
+  query('overview', q, null) as Promise<Record<string, unknown>>;
 function query(tab: Tab, q: AnalyticsQuery, sort: string | null) {
   const p = new URLSearchParams();
   if (q.from) p.set('date_from', q.from);

@@ -4,6 +4,7 @@
   import { logout } from '$lib/services/auth';
   import NoCompany from '$lib/components/NoCompany.svelte';
   import LogoMark from '$lib/components/LogoMark.svelte';
+  import PipelineProgressBar from '$lib/components/PipelineProgressBar.svelte';
 
   import * as Sidebar from '$lib/components/ui/sidebar';
   import * as Breadcrumb from '$lib/components/ui/breadcrumb';
@@ -25,9 +26,15 @@
     ChevronDown,
     AlertTriangle
   } from '@lucide/svelte';
+  import { onMount } from 'svelte';
   import { pageTitleStore } from '$lib/stores/page-title.svelte';
+  import { pipelineProgress } from '$lib/stores/pipeline-progress.svelte';
 
   let { data, children } = $props();
+
+  onMount(() => {
+    pipelineProgress.hydrateAndResume();
+  });
 
   const navItems = [
     { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -91,7 +98,7 @@
 
   async function signOut() {
     await logout();
-    await goto('/login', { replaceState: true, invalidateAll: true });
+    await goto('/login');
   }
 </script>
 
@@ -207,6 +214,8 @@
           </DropdownMenu.Root>
         </div>
       </header>
+
+      <PipelineProgressBar />
 
       <main class="flex-1 p-4 sm:p-6 md:p-8 min-w-0">
         {#if !data.hasCompany && !gated && !page.url.pathname.startsWith('/company')}

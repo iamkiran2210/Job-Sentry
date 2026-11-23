@@ -13,6 +13,7 @@
   import { ApiError } from '$lib/services/api-client';
   import { toast } from '$lib/stores/toast.svelte';
   import { confirmDialog } from '$lib/stores/confirm.svelte';
+  import { pipelineProgress } from '$lib/stores/pipeline-progress.svelte';
   import { toastError } from '$lib/errors';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -165,6 +166,17 @@
 
   load();
 
+  // Auto-refresh ranking table when a background upload+rank or post-refresh task completes for this job
+  let lastHandledCompletionAt = 0;
+  $effect(() => {
+    const done = pipelineProgress.lastCompleted;
+    if (done && done.jobId === id && done.at > lastHandledCompletionAt && !busy) {
+      lastHandledCompletionAt = done.at;
+      load();
+      loadHistory();
+    }
+  });
+
   async function executeRank(
     opts: { force?: boolean; applicationIds?: string[]; useFilters?: boolean },
     action: 'rank' | 'force' | 'selected' | 'individual',
@@ -175,6 +187,42 @@
     busyAction = action;
     busyAppId = singleId;
     msg = '';
+    const resolvedJob = jobTitle || 'Applicant Ranking';
+    const singleLabel = singleId ? names[singleId] || `Application ${shortId(singleId)}` : undefined;
+    const taskKind =
+      action === 'force'
+        ? 'rescore'
+        : action === 'selected'
+          ? 'selected'
+          : action === 'individual'
+            ? 'individual'
+            : 'rank';
+    const taskId = pipelineProgress.start({
+      jobId: id,
+      jobName: resolvedJob,
+      kind: taskKind,
+      stage: 'analyzing',
+      subject: singleLabel,
+      includeNotify: autoApplyDecisions,
+      runCountBefore: history.length,
+      detail:
+        action === 'individual' && singleLabel
+          ? `Analyzing & scoring ${singleLabel}…`
+          : action === 'selected'
+            ? `Re-scoring ${opts.applicationIds?.length ?? 0} selected applicants…`
+            : opts.force
+              ? 'Re-analyzing & re-scoring all applicants…'
+              : 'Analyzing processed resumes & preparing scores…',
+      progress: 18,
+      notify: true
+    });
+    pipelineProgress.simulateRankingPhases(taskId, {
+      includesVerify: forceVerify || !opts.force,
+      includeNotify: autoApplyDecisions,
+      isRerun: !!opts.force,
+      subject: singleLabel
+    });
+
     try {
       const res = await runRanking(id, {
         force: opts.force ?? false,
@@ -200,6 +248,12 @@
       const notifResults = Array.isArray(res?.notification_results)
         ? (res.notification_results as { channel?: string; reason?: string }[])
         : [];
+      if (verifiedCount > 0) {
+        toast.info(
+          `${resolvedJob} · Verified`,
+          `Completed verification checks for ${verifiedCount} applicant${verifiedCount === 1 ? '' : 's'}.`
+        );
+      }
       const verSuffix = verifiedCount > 0 ? ` Verified ${verifiedCount} applicant(s).` : '';
       const autoSuffix = autoApplyDecisions
         ? autoApplied > 0 || notifSent > 0 || notifFailed > 0
@@ -215,22 +269,41 @@
         const firstErr =
           notifResults.find((n) => n.channel === 'sendpulse_failed' || n.channel === 'smtp_failed')?.reason ??
           'Check SendPulse settings in backend/.env.';
-        toast.error(`Auto-applied ${autoApplied} decision(s), but ${notifFailed} email(s) failed`, firstErr);
+        pipelineProgress.fail(
+          taskId,
+          `Auto-applied ${autoApplied} decision(s), but ${notifFailed} email(s) failed: ${firstErr}`,
+          `${resolvedJob} · Email notification issue`
+        );
       } else if (opts.applicationIds?.length === 1) {
-        const label = names[opts.applicationIds[0]] || `Application ${shortId(opts.applicationIds[0])}`;
-        toast.success('Individual ranking updated', `Re-scored ${label} and updated relative ranks.${verSuffix}${autoSuffix}`);
+        const label = singleLabel || `Application ${shortId(opts.applicationIds[0])}`;
+        pipelineProgress.complete(
+          taskId,
+          `Re-scored ${label} and updated relative ranks.${verSuffix}${autoSuffix}`,
+          { title: `Ranking complete · ${resolvedJob}`, verifiedCount, showViewAction: false }
+        );
       } else if (opts.applicationIds && opts.applicationIds.length > 1) {
-        toast.success(
-          'Selected applicants ranked',
-          `Re-scored ${opts.applicationIds.length} selected applicants and updated relative ranks.${verSuffix}${autoSuffix}`
+        pipelineProgress.complete(
+          taskId,
+          `Re-scored ${opts.applicationIds.length} selected applicants and updated relative ranks.${verSuffix}${autoSuffix}`,
+          { title: `Ranking complete · ${resolvedJob}`, verifiedCount, showViewAction: false }
         );
       } else if (opts.force) {
-        toast.success('Force re-score complete', `Recalculated scores for every applicant.${verSuffix}${autoSuffix}`);
+        pipelineProgress.complete(
+          taskId,
+          `Recalculated scores for every applicant.${verSuffix}${autoSuffix}`,
+          { title: `Re-run complete · ${resolvedJob}`, verifiedCount, showViewAction: false }
+        );
       } else {
-        toast.success('Ranking updated', `Scores now reflect all processed resumes.${verSuffix}${autoSuffix}`);
+        pipelineProgress.complete(
+          taskId,
+          `Scores now reflect all processed resumes.${verSuffix}${autoSuffix}`,
+          { title: `Ranking complete · ${resolvedJob}`, verifiedCount, showViewAction: false }
+        );
       }
     } catch (e) {
-      toastError(e, 'Ranking failed');
+      if (e instanceof ApiError && e.isPageUnload) return;
+      const detail = e instanceof ApiError ? e.message : 'Ranking failed';
+      pipelineProgress.fail(taskId, detail, `${resolvedJob} · Ranking failed`);
     } finally {
       busy = false;
       busyAction = null;

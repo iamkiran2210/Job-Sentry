@@ -14,6 +14,7 @@
   import { toast } from '$lib/stores/toast.svelte';
   import { toastError } from '$lib/errors';
   import { confirmDialog } from '$lib/stores/confirm.svelte';
+  import { pipelineProgress } from '$lib/stores/pipeline-progress.svelte';
   import Skeleton from '$lib/components/Skeleton.svelte';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
   import CandidateProfile from '$lib/components/profile/CandidateProfile.svelte';
@@ -264,17 +265,53 @@
 
   const runVerify = () =>
     run('verify', async () => {
-      await verifyApplication(applicationId);
-      toast.success(
-        'Verification checks completed',
-        'Includes email domain MX, content authenticity, LinkedIn, GitHub, portfolio, and project link checks.'
-      );
+      const jobName = a?.application.job_title || 'Job';
+      const candLabel = nameOf(a?.candidate) ?? nameOf(a?.candidate?.profile) ?? 'applicant';
+      const taskId = pipelineProgress.start({
+        jobId,
+        jobName,
+        kind: 'verify',
+        stage: 'verifying',
+        subject: candLabel,
+        detail: `Running email MX, authenticity, LinkedIn, GitHub & portfolio checks for ${candLabel}…`,
+        progress: 35,
+        notify: true
+      });
+      try {
+        await verifyApplication(applicationId);
+        pipelineProgress.complete(
+          taskId,
+          `Verification checks completed for ${candLabel}.`,
+          { title: `Verified · ${jobName}`, verifiedCount: 1, showViewAction: false }
+        );
+      } catch (e) {
+        if (e instanceof ApiError && e.isPageUnload) return;
+        pipelineProgress.fail(
+          taskId,
+          e instanceof ApiError ? e.message : 'Verification failed',
+          `${jobName} · Verification failed`
+        );
+        throw e;
+      }
     });
 
   async function sendNotification() {
     if (busy) return;
     busy = true;
     busyOp = 'notify';
+    const jobName = a?.application.job_title || 'Job';
+    const candLabel = nameOf(a?.candidate) ?? nameOf(a?.candidate?.profile) ?? 'candidate';
+    const taskId = pipelineProgress.start({
+      jobId,
+      jobName,
+      kind: 'notify',
+      stage: 'notifying',
+      subject: candLabel,
+      includeNotify: true,
+      detail: `Sending decision email to ${a?.candidate.email ?? candLabel}…`,
+      progress: 45,
+      notify: true
+    });
     try {
       const res = await notifyCandidate(applicationId, {
         outcome: a?.application.status === 'rejected' ? 'rejected' : 'shortlisted',
@@ -282,14 +319,27 @@
         include_score: true
       });
       if (res.delivered) {
-        toast.success('Candidate email sent', `${res.subject} — ${res.reason}`);
+        pipelineProgress.complete(
+          taskId,
+          `Email delivered to ${res.recipient ?? a?.candidate.email ?? candLabel} (${res.subject}).`,
+          { title: `Notification sent · ${jobName}`, showViewAction: false }
+        );
       } else if (res.channel === 'sendpulse_failed' || res.channel === 'smtp_failed' || res.channel === 'skipped') {
-        toast.error('Candidate email not sent', res.reason);
+        pipelineProgress.fail(taskId, res.reason, `${jobName} · Candidate email not sent`);
       } else {
-        toast.info('Notification recorded (Audit Outbox)', `${res.subject} — ${res.reason}`);
+        pipelineProgress.complete(
+          taskId,
+          `Recorded in Audit Outbox (${res.subject}) — ${res.reason}`,
+          { title: `Notification logged · ${jobName}`, showViewAction: false }
+        );
       }
     } catch (e) {
-      toastError(e, 'Could not notify candidate');
+      if (e instanceof ApiError && e.isPageUnload) return;
+      pipelineProgress.fail(
+        taskId,
+        e instanceof ApiError ? e.message : 'Could not notify candidate',
+        `${jobName} · Notification failed`
+      );
     } finally {
       busy = false;
       busyOp = null;
@@ -298,44 +348,80 @@
 
   const runIndividualRank = () =>
     run('rank', async () => {
-      const parsedThreshold = minAcceptThreshold.trim() !== '' ? Number(minAcceptThreshold) : undefined;
-      const res = await runRanking(jobId, {
-        applicationIds: [applicationId],
-        force: true,
-        forceVerify: forceVerifyOnRank,
-        decisionAgent: selectedAgent,
-        minAcceptThreshold:
-          parsedThreshold !== undefined && Number.isFinite(parsedThreshold)
-            ? parsedThreshold
-            : undefined,
-        autoApplyDecisions: autoApplyOnRank
+      const jobName = a?.application.job_title || 'Job';
+      const candLabel = nameOf(a?.candidate) ?? nameOf(a?.candidate?.profile) ?? 'applicant';
+      const taskId = pipelineProgress.start({
+        jobId,
+        jobName,
+        kind: 'individual',
+        stage: 'analyzing',
+        subject: candLabel,
+        includeNotify: autoApplyOnRank,
+        detail: `Re-scoring ${candLabel} against role requirements…`,
+        progress: 22,
+        notify: true
       });
-      const verified = typeof res?.verified_count === 'number' && res.verified_count > 0;
-      const autoApplied = typeof res?.auto_applied_count === 'number' ? res.auto_applied_count : 0;
-      const notifSent = typeof res?.notifications_sent === 'number' ? res.notifications_sent : 0;
-      const notifFailed = typeof res?.notifications_failed === 'number' ? res.notifications_failed : 0;
-      const notifResults = Array.isArray(res?.notification_results)
-        ? (res.notification_results as { channel?: string; reason?: string }[])
-        : [];
-      if (notifFailed > 0) {
-        const errReason =
-          notifResults.find((n) => n.channel === 'sendpulse_failed' || n.channel === 'smtp_failed')?.reason ??
-          'Check SendPulse settings in backend/.env.';
-        toast.error('Applicant ranked, but email failed', errReason);
-        return;
+      pipelineProgress.simulateRankingPhases(taskId, {
+        includesVerify: forceVerifyOnRank,
+        includeNotify: autoApplyOnRank,
+        isRerun: true,
+        subject: candLabel
+      });
+      try {
+        const parsedThreshold = minAcceptThreshold.trim() !== '' ? Number(minAcceptThreshold) : undefined;
+        const res = await runRanking(jobId, {
+          applicationIds: [applicationId],
+          force: true,
+          forceVerify: forceVerifyOnRank,
+          decisionAgent: selectedAgent,
+          minAcceptThreshold:
+            parsedThreshold !== undefined && Number.isFinite(parsedThreshold)
+              ? parsedThreshold
+              : undefined,
+          autoApplyDecisions: autoApplyOnRank
+        });
+        const verified = typeof res?.verified_count === 'number' && res.verified_count > 0;
+        const autoApplied = typeof res?.auto_applied_count === 'number' ? res.auto_applied_count : 0;
+        const notifSent = typeof res?.notifications_sent === 'number' ? res.notifications_sent : 0;
+        const notifFailed = typeof res?.notifications_failed === 'number' ? res.notifications_failed : 0;
+        const notifResults = Array.isArray(res?.notification_results)
+          ? (res.notification_results as { channel?: string; reason?: string }[])
+          : [];
+        if (verified) {
+          toast.info(`${jobName} · Verified`, `Verification checks refreshed for ${candLabel}.`);
+        }
+        if (notifFailed > 0) {
+          const errReason =
+            notifResults.find((n) => n.channel === 'sendpulse_failed' || n.channel === 'smtp_failed')?.reason ??
+            'Check SendPulse settings in backend/.env.';
+          pipelineProgress.fail(taskId, errReason, `${jobName} · Ranked, but email failed`);
+          return;
+        }
+        const parts: string[] = [
+          verified
+            ? `Score, rank, and verification refreshed for ${candLabel}.`
+            : `Score and relative rank refreshed for ${candLabel}.`
+        ];
+        if (autoApplyOnRank) {
+          if (autoApplied > 0) parts.push('Status auto-updated.');
+          if (notifSent > 0) parts.push('Candidate notified via SendPulse.');
+          else if (notifResults.some((n) => n.channel === 'audit_outbox'))
+            parts.push('Notification logged to Audit Outbox.');
+        }
+        pipelineProgress.complete(taskId, parts.join(' '), {
+          title: `Ranking complete · ${jobName}`,
+          verifiedCount: verified ? 1 : 0,
+          showViewAction: true
+        });
+      } catch (e) {
+        if (e instanceof ApiError && e.isPageUnload) return;
+        pipelineProgress.fail(
+          taskId,
+          e instanceof ApiError ? e.message : 'Individual ranking failed',
+          `${jobName} · Ranking failed`
+        );
+        throw e;
       }
-      const parts: string[] = [
-        verified
-          ? 'Score, relative rank, and verification checks refreshed.'
-          : 'Score and relative rank refreshed for this applicant.'
-      ];
-      if (autoApplyOnRank) {
-        if (autoApplied > 0) parts.push('Status auto-updated.');
-        if (notifSent > 0) parts.push('Candidate notified via SendPulse.');
-        else if (notifResults.some((n) => n.channel === 'audit_outbox'))
-          parts.push('Notification logged to Audit Outbox.');
-      }
-      toast.success('Applicant ranked', parts.join(' '));
     });
 
   async function removeApplication() {

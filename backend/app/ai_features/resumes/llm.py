@@ -17,7 +17,7 @@ from .errors import FailureCode, PipelineError
 log = logging.getLogger("resumes.llm")
 
 _PROVIDER_COOLDOWN_SECONDS = 60.0
-_CLOUD_TIMEOUT_CAP_SECONDS = 45.0
+_CLOUD_TIMEOUT_CAP_SECONDS = 75.0
 _provider_cooldown_until: dict[str, float] = {}
 
 _CODE = {

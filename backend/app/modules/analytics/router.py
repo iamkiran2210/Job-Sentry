@@ -150,23 +150,29 @@ async def _trend(db, query, start: date, end: date, interval: Literal["day", "we
         )
     ).all()
     counts = {row[0].date(): row[1] for row in records}
-    cursor = start
+    if interval == "day":
+        cursor = start
+        end_bucket = end
+    elif interval == "week":
+        cursor = start - timedelta(days=start.weekday())
+        end_bucket = end - timedelta(days=end.weekday())
+    else:
+        cursor = start.replace(day=1)
+        end_bucket = end.replace(day=1)
+
     items = []
-    while cursor <= end:
+    while cursor <= end_bucket:
+        items.append({"bucket": cursor.isoformat(), "applications": counts.get(cursor, 0)})
         if interval == "day":
-            key = cursor
             cursor += timedelta(days=1)
         elif interval == "week":
-            key = cursor - timedelta(days=cursor.weekday())
             cursor += timedelta(days=7)
         else:
-            key = cursor.replace(day=1)
             cursor = (
-                key.replace(year=key.year + 1, month=1)
-                if key.month == 12
-                else key.replace(month=key.month + 1)
+                cursor.replace(year=cursor.year + 1, month=1)
+                if cursor.month == 12
+                else cursor.replace(month=cursor.month + 1)
             )
-        items.append({"bucket": key.isoformat(), "applications": counts.get(key, 0)})
     return items
 
 

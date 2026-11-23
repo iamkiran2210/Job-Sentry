@@ -49,10 +49,11 @@ def _extract_layout_aware_text(page) -> str:
         return "\n".join(b[4] for b in text_blocks)
 
     # Detect genuine two-column pages: multiple non-spanning blocks strictly left AND strictly right
-    # of a vertical gutter near the middle of the page.
+    # of a vertical gutter. Test asymmetric layouts too (e.g. 30/70 or 65/35 Canva/LaTeX templates)
+    # and penalize candidate splits that slice through body blocks.
     best_split: float | None = None
-    best_count = 0
-    for frac in (0.35, 0.42, 0.50, 0.58):
+    best_score = -1
+    for frac in (0.28, 0.32, 0.36, 0.40, 0.45, 0.50, 0.55, 0.60, 0.64, 0.68, 0.72):
         split_x = page_width * frac
         left = [b for b in text_blocks if b[2] <= split_x + 8.0]
         right = [b for b in text_blocks if b[0] >= split_x - 8.0]
@@ -60,9 +61,22 @@ def _extract_layout_aware_text(page) -> str:
             # Verify vertical overlap between left and right columns (not just stacked blocks).
             left_y = (min(b[1] for b in left), max(b[3] for b in left))
             right_y = (min(b[1] for b in right), max(b[3] for b in right))
-            overlap = min(left_y[1], right_y[1]) - max(left_y[0], right_y[0])
-            if overlap > 40.0 and (len(left) + len(right)) > best_count:
-                best_count = len(left) + len(right)
+            band_top = max(left_y[0], right_y[0])
+            band_bot = min(left_y[1], right_y[1])
+            overlap = band_bot - band_top
+            if overlap <= 40.0:
+                continue
+            straddling = [
+                b
+                for b in text_blocks
+                if b[0] < split_x - 8.0
+                and b[2] > split_x + 8.0
+                and b[3] > band_top
+                and b[1] < band_bot
+            ]
+            score = (len(left) + len(right)) * 2 - len(straddling) * 3
+            if score > best_score:
+                best_score = score
                 best_split = split_x
 
     if best_split is None:
@@ -73,20 +87,27 @@ def _extract_layout_aware_text(page) -> str:
     left_col = []
     right_col = []
     spanning_bottom = []
-    col_top_y = min(
-        b[1]
-        for b in text_blocks
-        if b[2] <= best_split + 8.0 or b[0] >= best_split - 8.0
-    )
+    paired_left = [b for b in text_blocks if b[2] <= best_split + 8.0]
+    paired_right = [b for b in text_blocks if b[0] >= best_split - 8.0]
+    col_top_y = max(min(b[1] for b in paired_left), min(b[1] for b in paired_right))
+    col_bot_y = min(max(b[3] for b in paired_left), max(b[3] for b in paired_right))
     for b in text_blocks:
         if b[2] <= best_split + 8.0:
             left_col.append(b)
         elif b[0] >= best_split - 8.0:
             right_col.append(b)
-        elif b[1] <= col_top_y + 10.0:
+        elif b[3] <= col_top_y + 12.0:
             spanning_top.append(b)
-        else:
+        elif b[1] >= col_bot_y - 12.0:
             spanning_bottom.append(b)
+        else:
+            # Body block vertically inside the two-column band (e.g. a wide line in a 65/35 Canva
+            # left column): keep it in its column by horizontal midpoint rather than dumping at bottom.
+            mid_x = (b[0] + b[2]) / 2.0
+            if mid_x <= best_split or b[0] < page_width * 0.18:
+                left_col.append(b)
+            else:
+                right_col.append(b)
 
     for group in (spanning_top, left_col, right_col, spanning_bottom):
         group.sort(key=lambda b: (round(b[1], 1), round(b[0], 1)))

@@ -1,4 +1,4 @@
-import { ApiError } from '$lib/services/api-client';
+import { ApiError, isPageUnloading } from '$lib/services/api-client';
 import { toast } from '$lib/stores/toast.svelte';
 
 /** Turns any error into a plain-language title plus a useful detail line. Never exposes ids or request paths. */
@@ -30,6 +30,7 @@ export function explain(e: unknown): { title: string; detail?: string } {
 /** Backend answers with a company-related 400/403/404 when the user has not created or joined a company. */
 export const isNoCompany = (e: unknown) => e instanceof ApiError && [400, 403, 404].includes(e.status) && /compan/i.test(e.message);
 export function toastError(e: unknown, title?: string) {
+  if (isPageUnloading() || (e instanceof ApiError && e.isPageUnload)) return;
   if (isNoCompany(e)) { toast.info('Join or create a company', 'Create a company, or ask an admin to add you, to use this page.'); return; }
   const x = explain(e);
   const same = !x.detail || x.detail.toLowerCase() === x.title.toLowerCase();
