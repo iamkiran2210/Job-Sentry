@@ -11,9 +11,40 @@ export interface ApiEnvelope<T> {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public errors?: unknown) {
+  constructor(
+    public status: number,
+    message: string,
+    public errors?: unknown,
+    public isPageUnload = false
+  ) {
     super(message);
   }
+}
+
+let pageUnloading = false;
+let unloadResetTimer: ReturnType<typeof setTimeout> | null = null;
+
+if (typeof window !== 'undefined') {
+  const markUnloading = () => {
+    pageUnloading = true;
+    if (unloadResetTimer) clearTimeout(unloadResetTimer);
+    unloadResetTimer = setTimeout(() => {
+      pageUnloading = false;
+    }, 4000);
+  };
+  window.addEventListener('beforeunload', markUnloading);
+  window.addEventListener('pagehide', markUnloading);
+  window.addEventListener('pageshow', () => {
+    pageUnloading = false;
+    if (unloadResetTimer) {
+      clearTimeout(unloadResetTimer);
+      unloadResetTimer = null;
+    }
+  });
+}
+
+export function isPageUnloading(): boolean {
+  return pageUnloading;
 }
 
 const REFRESH_KEY = 'js_refresh_token';
@@ -66,6 +97,9 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
     res = await raw(path, init);
     if (res.status === 401 && init.auth !== false && (await tryRefresh())) res = await raw(path, init);
   } catch {
+    if (pageUnloading) {
+      throw new ApiError(0, 'Page is reloading…', undefined, true);
+    }
     throw new ApiError(0, 'Cannot reach the server. Check your connection and PUBLIC_API_BASE_URL.');
   }
   const body = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
@@ -87,7 +121,18 @@ export function upload<T>(path: string, file: File, onProgress: (pct: number) =>
       xhr.open('POST', `${API_BASE_URL}${API_PREFIX}${path}`);
       if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
       xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-      xhr.onerror = () => reject(new ApiError(0, 'Cannot reach the server.'));
+      xhr.onerror = () =>
+        reject(
+          pageUnloading
+            ? new ApiError(0, 'Page is reloading…', undefined, true)
+            : new ApiError(0, 'Cannot reach the server.')
+        );
+      xhr.onabort = () =>
+        reject(
+          pageUnloading
+            ? new ApiError(0, 'Page is reloading…', undefined, true)
+            : new ApiError(0, 'Upload aborted.')
+        );
       xhr.onload = () => { let body = null; try { body = JSON.parse(xhr.responseText); } catch { /* non-JSON */ } resolve({ status: xhr.status, body }); };
       const fd = new FormData();
       fd.append('files', file);

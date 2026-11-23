@@ -1,5 +1,6 @@
 import { goto } from '$app/navigation';
 import { toast } from './toast.svelte';
+import { ApiError, isPageUnloading } from '$lib/services/api-client';
 import { resumeStatus } from '$lib/services/resumes';
 import { getRankingHistory, runRanking } from '$lib/services/applications';
 
@@ -167,8 +168,14 @@ class PipelineProgressStore {
         continue;
       }
 
-      // Case 3: Page refreshed while ranking/verification/notification was running on backend -> reconcile!
-      if (task.stage === 'verifying' || task.stage === 'ranking' || task.stage === 'notifying') {
+      // Case 3: Page refreshed while ranking/verification/notification (or ranking's initial 'analyzing'
+      // phase without resumeIds) was running on backend -> smoothly reconnect & reconcile!
+      if (
+        task.stage === 'analyzing' ||
+        task.stage === 'verifying' ||
+        task.stage === 'ranking' ||
+        task.stage === 'notifying'
+      ) {
         task.detail = 'Reconnecting to in-progress run after refresh…';
         this.persist();
         this.reconcileInFlightRanking(task.id);
@@ -343,6 +350,9 @@ class PipelineProgressStore {
             { title: `Ranking complete · ${task.jobName}`, verifiedCount: verified }
           );
         } catch (err) {
+          if (isPageUnloading() || (err instanceof ApiError && err.isPageUnload)) {
+            return;
+          }
           const msg = err instanceof Error ? err.message : 'Auto-ranking failed';
           this.fail(id, msg, `${task.jobName} · Ranking failed`);
         }
@@ -390,11 +400,18 @@ class PipelineProgressStore {
         /* ignore transient errors */
       }
 
-      task.progress = Math.min(94, task.progress + 3);
+      if (task.stage === 'analyzing') {
+        task.stage = 'ranking';
+      }
+      task.detail =
+        checks <= 2
+          ? 'Reconnected — waiting for server ranking results…'
+          : 'Ranking still running on server — scores will update automatically…';
+      task.progress = Math.min(94, Math.max(task.progress, 48) + 2);
       task.updatedAt = Date.now();
       this.persist();
 
-      if (checks >= 15) {
+      if (checks >= 35) {
         this.complete(id, 'Latest ranking data is ready to view.', {
           title: `Updated · ${task.jobName}`
         });
@@ -533,8 +550,9 @@ class PipelineProgressStore {
     }
   }
 
-  /** Marks a task failed and surfaces a clear error popup. */
+  /** Marks a task failed and surfaces a clear error popup. Never overwrites active state during a browser refresh. */
   fail(id: string, detail: string, title?: string) {
+    if (isPageUnloading()) return;
     this.clearTimers(id);
     const task = this.tasks.find((t) => t.id === id);
     if (!task) return;

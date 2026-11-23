@@ -183,6 +183,7 @@
       }
       syncUploadProgress();
     } catch (e) {
+      if (e instanceof ApiError && e.isPageUnload) return;
       it.phase = 'failed';
       it.note = e instanceof ApiError ? e.message : 'Upload failed';
       toastError(e, `Could not upload ${it.file.name}`);
@@ -228,6 +229,7 @@
         { title: `Ranking complete · ${resolvedJobName()}`, verifiedCount: verified, showViewAction: true }
       );
     } catch (e) {
+      if (e instanceof ApiError && e.isPageUnload) return;
       const detail = e instanceof ApiError ? e.message : 'Ranking failed';
       pipelineProgress.fail(taskId, detail, `${resolvedJobName()} · Ranking failed`);
     } finally {

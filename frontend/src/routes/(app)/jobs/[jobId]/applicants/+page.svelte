@@ -301,6 +301,7 @@
         );
       }
     } catch (e) {
+      if (e instanceof ApiError && e.isPageUnload) return;
       const detail = e instanceof ApiError ? e.message : 'Ranking failed';
       pipelineProgress.fail(taskId, detail, `${resolvedJob} · Ranking failed`);
     } finally {

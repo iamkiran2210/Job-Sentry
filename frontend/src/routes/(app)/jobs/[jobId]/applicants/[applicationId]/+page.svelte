@@ -285,6 +285,7 @@
           { title: `Verified · ${jobName}`, verifiedCount: 1, showViewAction: false }
         );
       } catch (e) {
+        if (e instanceof ApiError && e.isPageUnload) return;
         pipelineProgress.fail(
           taskId,
           e instanceof ApiError ? e.message : 'Verification failed',
@@ -333,6 +334,7 @@
         );
       }
     } catch (e) {
+      if (e instanceof ApiError && e.isPageUnload) return;
       pipelineProgress.fail(
         taskId,
         e instanceof ApiError ? e.message : 'Could not notify candidate',
@@ -412,6 +414,7 @@
           showViewAction: true
         });
       } catch (e) {
+        if (e instanceof ApiError && e.isPageUnload) return;
         pipelineProgress.fail(
           taskId,
           e instanceof ApiError ? e.message : 'Individual ranking failed',
