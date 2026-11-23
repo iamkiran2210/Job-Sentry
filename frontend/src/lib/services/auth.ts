@@ -2,6 +2,7 @@ import { api, tokens, ApiError } from './api-client';
 import { invalidateDirectoryCache } from './directory';
 import { invalidateJobsCache } from './jobs';
 import { pageTitleStore } from '$lib/stores/page-title.svelte';
+import { pipelineProgress } from '$lib/stores/pipeline-progress.svelte';
 
 export interface User {
   id: string;
@@ -76,6 +77,7 @@ export const getMe = () => api<User>('/auth/me');
 
 export async function logout(): Promise<void> {
   invalidateSessionCache();
+  pipelineProgress.clearAll();
   disableGoogleAutoSelect();
   const refresh_token = tokens.refresh();
   try {
@@ -89,6 +91,7 @@ export async function logout(): Promise<void> {
 export async function deleteAccount(): Promise<Record<string, unknown>> {
   const res = await api<Record<string, unknown>>('/users/me', { method: 'DELETE' });
   invalidateSessionCache();
+  pipelineProgress.clearAll();
   disableGoogleAutoSelect();
   tokens.clear();
   try { sessionStorage.clear(); } catch { /* ignore */ }

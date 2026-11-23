@@ -185,7 +185,17 @@ class DescriptionToSkillsWorkflow:
         raw_engine = (_cfg_val("AI_ENGINE", "pydantic_ai") or "pydantic_ai").lower()
         # In `auto` mode, structured skill extraction runs on PydanticAI for fast native JSON schema enforcement.
         self.engine = "pydantic_ai" if raw_engine == "auto" else raw_engine
-        self.model_name = model_name or _cfg_val("AI_MODEL", "openai:gpt-4o") or "openai:gpt-4o"
+        # Prefer AI_FAST_MODEL for low-latency requirement extraction when no explicit override is supplied.
+        configured_primary = _cfg_val("AI_MODEL", "openai:gpt-4o") or "openai:gpt-4o"
+        configured_fast = (_cfg_val("AI_FAST_MODEL", "") or "").strip().strip("\"'")
+        self.model_name = (
+            model_name
+            or (
+                configured_fast
+                if configured_fast and configured_primary.strip().lower() not in {"heuristic", "test"}
+                else configured_primary
+            )
+        )
         self.api_key = api_key
         self.agent: Optional[Agent] = None
 
@@ -247,15 +257,25 @@ class DescriptionToSkillsWorkflow:
             provider = GoogleProvider(api_key=key) if key else GoogleProvider()
             return GoogleModel(clean_name, provider=provider)
         else:
+            from pydantic_ai.models.openai import OpenAIResponsesModel
+
             key = self.api_key or _cfg_val("OPENAI_API_KEY")
             clean_name = (
-                    raw_name.replace("openai:", "").replace("openai/", "").strip() or "gpt-4o"
+                    raw_name.replace("openai-chat:", "")
+                    .replace("openai:", "")
+                    .replace("openai/", "")
+                    .strip()
+                    or "gpt-4o"
             )
             provider = OpenAIProvider(api_key=key) if key else OpenAIProvider()
-            return OpenAIChatModel(clean_name, provider=provider)
+            if raw_name.strip().lower().startswith("openai-chat:"):
+                return OpenAIChatModel(clean_name, provider=provider)
+            return OpenAIResponsesModel(clean_name, provider=provider)
 
     def _build_pydantic_ai_agent(self) -> Agent:
         """Constructs PydanticAI Agent with explicit model and fallback bindings."""
+        from app.ai_features.ai.models import _OPENAI_REASONING_RE
+
         primary = self._build_single_model(self.model_name)
         fallbacks_raw = _cfg_val("AI_FALLBACK_MODELS", "") or ""
         fallback_names = [
@@ -268,7 +288,12 @@ class DescriptionToSkillsWorkflow:
             model_instance = primary
 
         is_gemini_primary = any(p in self.model_name.lower() for p in ("gemini", "google"))
-        agent_settings: dict[str, Any] = {"temperature": 0.0}
+        is_openai_reasoning = bool(_OPENAI_REASONING_RE.fullmatch(self.model_name.strip()))
+        agent_settings: dict[str, Any] = {"max_tokens": 4096}
+        if not is_openai_reasoning:
+            agent_settings["temperature"] = 0.0
+        else:
+            agent_settings["openai_reasoning_effort"] = "low"
         if is_gemini_primary:
             agent_settings["google_thinking_config"] = {"thinking_budget": 0}
 
@@ -327,6 +352,33 @@ class DescriptionToSkillsWorkflow:
             data={"suggestions": reqs},
         )
 
+    @staticmethod
+    def _ground_and_dedupe(output: RecommendationSchema, description: str) -> RecommendationSchema:
+        from app.ai_features.ai.grounding import Haystack
+
+        hay = Haystack(description)
+        seen: set[str] = set()
+        kept: list[Suggestion] = []
+        for s in output.data.suggestions:
+            name = s.name.strip()
+            if not name:
+                continue
+            key = name.casefold()
+            if key in seen:
+                continue
+            if not (hay.has_skill(name) or hay.has_loose(name, threshold=0.5)):
+                continue
+            seen.add(key)
+            s.name = name
+            kept.append(s)
+        if not kept:
+            return output
+        return RecommendationSchema(
+            success=output.success,
+            message=output.message,
+            data=SuggestionData(suggestions=kept),
+        )
+
     async def run_async(self, description: str) -> RecommendationSchema:
         """Executes extraction pipeline asynchronously."""
         if self.model_name.strip().lower() in {"heuristic", "test"}:
@@ -334,13 +386,14 @@ class DescriptionToSkillsWorkflow:
         try:
             if self.engine == "dspy":
                 loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(None, self._run_with_dspy, description)
+                out = await loop.run_in_executor(None, self._run_with_dspy, description)
+                return self._ground_and_dedupe(out, description)
             else:
                 if self.agent is None:
                     self.agent = self._build_pydantic_ai_agent()
                 wrapped = f"<job_description>\n{description[:30_000]}\n</job_description>"
-                result = await asyncio.wait_for(self.agent.run(wrapped), timeout=25.0)
-                return result.output
+                result = await asyncio.wait_for(self.agent.run(wrapped), timeout=35.0)
+                return self._ground_and_dedupe(result.output, description)
         except Exception:
             return await self._run_heuristic(description)
 

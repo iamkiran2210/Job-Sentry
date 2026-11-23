@@ -27,9 +27,48 @@ _URL = re.compile(
     re.I,
 )
 _BULLET = re.compile(r"^[\s\-*•·▪●–—]+")
-_DATE = r"(?:\d{4}(?:-\d{2})?|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{4})"
+_DATE = (
+    r"(?:\d{4}(?:-\d{2})?|"
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s*/\s*|\s+)\d{4})"
+)
 _DATE_RANGE = re.compile(
-    rf"(?P<s>{_DATE})\s*(?:to|-|–|—)\s*(?P<e>{_DATE}|Present|Current|Now)",
+    rf"(?P<s>{_DATE})\s*(?:to|-|–|—)\s*(?P<e>{_DATE}|Present|Current|Now|Ongoing)",
+    re.I,
+)
+_YEAR_RANGE_LINE = re.compile(r"^(?:19|20)\d{2}\s*[-–—/]\s*(?:19|20)\d{2}$")
+_NON_NAME_WORDS = frozenset(
+    {
+        "resume",
+        "curriculum vitae",
+        "cv",
+        "professional summary",
+        "summary",
+        "career objective",
+        "objective",
+        "work experience",
+        "experience",
+        "education",
+        "skills",
+        "technical skills",
+        "details",
+        "contact",
+    }
+)
+_TEMPLATE_DOMAINS = (
+    "qwikresume.com",
+    "zety.com",
+    "novoresume.com",
+    "resume.io",
+    "canva.com",
+    "livecareer.com",
+    "resumegenius.com",
+)
+_SKILL_PREFIX_RE = re.compile(
+    r"^(?:languages|frameworks|databases|tools|backend|frontend|cloud|devops|ai|ml|ml/dl|ai/ml|skills|technologies|libraries)\s*:\s*",
+    re.I,
+)
+_SKILL_LEVEL_SUFFIX_RE = re.compile(
+    r"\s+(?:expert|export|advanced|intermediate|beginner|native speaker|highly proficient|fluent)$",
     re.I,
 )
 _EMPLOY = re.compile(
@@ -120,33 +159,44 @@ def extract_resume(text: str) -> dict[str, Any]:
     head = sec.get(None, [])
     result: dict[str, Any] = {}
 
-    # name: first plausible "Firstname Lastname" line before any section
-    for ln in head[:4]:
-        if "@" not in ln and re.fullmatch(r"[A-Z][\w.'-]*(?: [A-Z][\w.'-]*){1,3}", ln.strip()):
+    # name: first plausible name line before any section (supports initials like "C KIRAN BABU")
+    for ln in head[:5]:
+        cand = ln.strip()
+        if (
+            "@" not in cand
+            and cand.casefold() not in _NON_NAME_WORDS
+            and re.fullmatch(r"[A-Z][\w.'-]*(?: [A-Z][\w.'-]*){1,3}", cand)
+        ):
             result["full_name"] = {
-                "value": ln.strip(),
+                "value": cand,
                 "confidence": 0.7,
-                "evidence": ln.strip(),
+                "evidence": cand,
             }
             break
 
     contact: dict[str, Any] = {}
-    if m := _EMAIL.search(text):
-        line = next((ln for ln in lines if m.group(0) in ln), m.group(0))
+    for m in _EMAIL.finditer(text):
+        email_val = m.group(0)
+        low_em = email_val.casefold()
+        if any(low_em.endswith(f"@{d}") and low_em.split("@", 1)[0] in {"support", "info", "help"} for d in _TEMPLATE_DOMAINS):
+            continue
         contact["email"] = {
-            "value": m.group(0),
+            "value": email_val,
             "confidence": 0.95,
-            "evidence": m.group(0),
+            "evidence": email_val,
         }
+        break
     for ln in head[:6]:
         if _EMAIL.search(ln) or _PHONE.search(ln):
             stripped_line = _EMAIL.sub("", ln)
             if p := _PHONE.search(stripped_line):
-                contact["phone"] = {
-                    "value": p.group(0).strip(),
-                    "confidence": 0.9,
-                    "evidence": p.group(0).strip(),
-                }
+                pval = p.group(0).strip()
+                if not _YEAR_RANGE_LINE.match(pval) and 7 <= len(re.sub(r"\D", "", pval)) <= 15:
+                    contact["phone"] = {
+                        "value": pval,
+                        "confidence": 0.9,
+                        "evidence": pval,
+                    }
             rest = [
                 x.strip()
                 for x in re.split(r"[|•·]", _PHONE.sub("", stripped_line))
@@ -159,12 +209,26 @@ def extract_resume(text: str) -> dict[str, Any]:
                     "evidence": rest[-1],
                 }
             break
+    if "phone" not in contact:
+        for ln in lines:
+            if p := _PHONE.search(_EMAIL.sub("", ln)):
+                pval = p.group(0).strip()
+                if not _YEAR_RANGE_LINE.match(pval) and 7 <= len(re.sub(r"\D", "", pval)) <= 15:
+                    contact["phone"] = {
+                        "value": pval,
+                        "confidence": 0.8,
+                        "evidence": pval,
+                    }
+                    break
     for u in _URL.findall(text):
+        low_u = u.casefold()
+        if any(d in low_u for d in _TEMPLATE_DOMAINS) or "udemy.com/certificate" in low_u:
+            continue
         key = (
             "linkedin_url"
-            if "linkedin" in u.lower()
+            if "linkedin" in low_u
             else "github_url"
-            if "github" in u.lower()
+            if "github" in low_u
             else "portfolio_url"
         )
         contact.setdefault(key, {"value": u, "confidence": 0.85, "evidence": u})
@@ -176,8 +240,9 @@ def extract_resume(text: str) -> dict[str, Any]:
 
     skills: list[dict] = []
     for ln in sec.get("skills", []):
-        for item in re.split(r"[,;|•·\n]", _clean(ln)):
-            item = item.strip(" .:")
+        cleaned_ln = _SKILL_PREFIX_RE.sub("", _clean(ln))
+        for item in re.split(r"[,;|•·\n]", cleaned_ln):
+            item = _SKILL_LEVEL_SUFFIX_RE.sub("", item.strip(" .:")).strip()
             if item and len(item) <= 40 and len(item.split()) <= 4 and not item.endswith(":"):
                 skills.append({"name": item, "confidence": 0.7, "evidence": _clean(ln)[:200]})
     result["skills"] = skills

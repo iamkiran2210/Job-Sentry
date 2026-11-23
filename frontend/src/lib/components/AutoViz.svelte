@@ -31,9 +31,19 @@
   }
   const fmtVal = (v: number, suffix = '') => `${fmtNum(v)}${suffix}`;
 
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function fmtDateLabel(raw: string): string {
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return raw;
+    const month = MONTHS[Number(m[2]) - 1];
+    const day = Number(m[3]);
+    return month ? `${month} ${day}` : raw;
+  }
+
   function kindFor(path: string, items: Item[], rows: boolean): Kind {
-    const dates = items.length > 1 && items.every((i) => !Number.isNaN(Date.parse(i.label)) && /^\d{4}-\d{2}/.test(i.label));
-    if (dates || (TIMEY.test(path) && rows && items.length > 1 && items.every((i) => !Number.isNaN(Date.parse(i.label))))) return 'line';
+    const dates = items.length >= 1 && items.every((i) => ISO_DATE.test(i.label));
+    if (dates || (TIMEY.test(path) && rows && items.length >= 1)) return 'line';
     if (/funnel/i.test(path)) return 'funnel';
     if (/distribution|bucket/i.test(path)) return 'column';
     if (DONUT.test(path) && items.length <= 7) return 'donut';
@@ -170,20 +180,47 @@
   }
 
   function linePoints(items: Item[]) {
-    const W = 640, H = 210, PL = 42, PR = 20, PT = 18, PB = 30;
-    const maxVal = Math.max(1, ...items.map((i) => i.value));
+    const W = 680, H = 220, PL = 44, PR = 24, PT = 20, PB = 34;
+    const rawMax = Math.max(0, ...items.map((i) => i.value));
+    const maxVal = rawMax <= 0 ? 4 : rawMax <= 2 ? 2 : Math.ceil(rawMax);
+    const total = items.reduce((a, i) => a + i.value, 0);
     const spanW = W - PL - PR;
     const spanH = H - PT - PB;
     const pts = items.map((i, k) => ({
       x: PL + (items.length > 1 ? (k / (items.length - 1)) * spanW : spanW / 2),
       y: PT + spanH - (i.value / maxVal) * spanH,
-      label: i.label,
+      label: fmtDateLabel(i.label),
+      rawLabel: i.label,
       value: i.value
     }));
-    const poly = pts.map((p) => `${p.x},${p.y}`).join(' ');
-    const area = pts.length ? `${pts[0].x},${PT + spanH} ${poly} ${pts[pts.length - 1].x},${PT + spanH}` : '';
+    const poly = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const area =
+      pts.length > 1
+        ? `${pts[0].x.toFixed(1)},${PT + spanH} ${poly} ${pts[pts.length - 1].x.toFixed(1)},${PT + spanH}`
+        : '';
     const midY = PT + spanH / 2;
-    return { W, H, PL, PR, PT, PB, maxVal, midY, pts, poly, area };
+    const midLabel = Number.isInteger(maxVal / 2) ? String(maxVal / 2) : (maxVal / 2).toFixed(1);
+
+    // Choose up to 5 evenly spaced x-axis labels without crowding
+    const tickCount = Math.min(5, pts.length);
+    const xTicks: { x: number; label: string; anchor: 'start' | 'middle' | 'end' }[] = [];
+    if (tickCount === 1) {
+      xTicks.push({ x: pts[0].x, label: pts[0].label, anchor: 'middle' });
+    } else if (tickCount > 1) {
+      const seen = new Set<number>();
+      for (let t = 0; t < tickCount; t++) {
+        const idx = Math.round((t * (pts.length - 1)) / (tickCount - 1));
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        xTicks.push({
+          x: pts[idx].x,
+          label: pts[idx].label,
+          anchor: t === 0 ? 'start' : t === tickCount - 1 ? 'end' : 'middle'
+        });
+      }
+    }
+
+    return { W, H, PL, PR, PT, PB, rawMax, maxVal, midLabel, total, midY, pts, poly, area, xTicks };
   }
 </script>
 
@@ -305,7 +342,14 @@
             </div>
           {:else}
             {@const lp = linePoints(c.items)}
-            <div style="height: 215px">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{lp.pts.length} interval{lp.pts.length === 1 ? '' : 's'}</span>
+              <div class="flex items-center gap-3 tabular-nums">
+                <span>Total: <strong class="text-foreground">{fmtVal(lp.total, c.suffix)}</strong></span>
+                <span>Peak: <strong class="text-indigo-600">{fmtVal(lp.rawMax, c.suffix)}</strong></span>
+              </div>
+            </div>
+            <div style="height: 220px">
               <svg viewBox={`0 0 ${lp.W} ${lp.H}`} class="h-full w-full" role="img" aria-label={`${c.title} line chart`}>
                 <defs>
                   <linearGradient id={`line-grad-${uid}-${idx}`} x1="0" y1="0" x2="1" y2="0">
@@ -324,22 +368,30 @@
                 {#if lp.area}
                   <polygon points={lp.area} fill={`url(#area-grad-${uid}-${idx})`} />
                 {/if}
-                {#if lp.poly}
+                {#if lp.poly && lp.pts.length > 1}
                   <polyline points={lp.poly} fill="none" stroke={`url(#line-grad-${uid}-${idx})`} stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" />
                 {/if}
                 {#each lp.pts as p}
-                  <circle cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke={LINE_STROKE} stroke-width="2.25">
-                    <title>{p.label}: {fmtVal(p.value, c.suffix)}</title>
-                  </circle>
-                {/each}
-                {#if lp.pts.length}
-                  <text x={lp.PL} y={lp.H - 8} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground">{lp.pts[0].label}</text>
-                  {#if lp.pts.length > 1}
-                    <text x={lp.W - lp.PR} y={lp.H - 8} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor="end">{lp.pts[lp.pts.length - 1].label}</text>
+                  {#if p.value > 0 || lp.pts.length <= 16}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={p.value > 0 ? 4.5 : 2.75}
+                      fill={p.value > 0 ? LINE_STROKE : '#ffffff'}
+                      stroke={LINE_STROKE}
+                      stroke-width={p.value > 0 ? 2 : 1.5}
+                      opacity={p.value > 0 ? 1 : 0.65}
+                    >
+                      <title>{p.label} ({p.rawLabel}): {fmtVal(p.value, c.suffix)}</title>
+                    </circle>
                   {/if}
-                  <text x={lp.PL - 6} y={lp.PT + 5} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor="end">{fmtVal(lp.maxVal, c.suffix)}</text>
-                  <text x={lp.PL - 6} y={lp.H - lp.PB} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor="end">0</text>
-                {/if}
+                {/each}
+                {#each lp.xTicks as t}
+                  <text x={t.x} y={lp.H - 10} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor={t.anchor}>{t.label}</text>
+                {/each}
+                <text x={lp.PL - 7} y={lp.PT + 4} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor="end">{fmtVal(lp.maxVal, c.suffix)}</text>
+                <text x={lp.PL - 7} y={lp.midY + 4} font-size="10" font-weight="500" fill="currentColor" class="text-muted-foreground" text-anchor="end">{lp.midLabel}</text>
+                <text x={lp.PL - 7} y={lp.H - lp.PB + 3} font-size="11" font-weight="600" fill="currentColor" class="text-muted-foreground" text-anchor="end">0</text>
               </svg>
             </div>
           {/if}

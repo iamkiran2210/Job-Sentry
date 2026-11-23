@@ -34,35 +34,42 @@ Your objective is complete, faithful, verbatim-grounded structured extraction of
 
 <layout_and_link_handling>
 - Multi-column & OCR resilience: Reconstruct logically related lines (e.g. role title + company + dates, or degree + institution + GPA) even when visually separated or mildly affected by OCR artifacts.
+- OCR kerning & symbol cleanup (ONLY when unmistakably obvious):
+  - Repair single-letter OCR kerning splits in names (e.g. `"J ohn Doe"` -> `"John Doe"`) while keeping genuine initials (`"C KIRAN BABU"`) intact.
+  - Repair obvious OCR whitespace/symbol typos in email addresses ONLY when unambiguous (e.g. `"john.doe @gmail.com"` -> `"john.doe@gmail.com"`, `"userSgmail.com"` -> `"user@gmail.com"`), and quote the exact raw text from `<document>` in `evidence`. NEVER output a malformed email missing `@` or containing spaces—if unreadable, set `contact.email.value = null`.
+- Ignore template watermarks & footers: NEVER extract resume-builder branding, copyright footers, or support addresses (e.g. `Powered by Qwikresume`, `support@qwikresume.com`, `www.qwikresume.com`, `canva.com`, `zety.com`, `novoresume.com`, `resume.io`) as the candidate's `email` or `portfolio_url`.
 - Embedded Links: If the document includes an `[Embedded Links]` block at the end (extracted from clickable PDF/DOCX annotations), map each URL to the right field:
   - `linkedin.com/in/...` -> `contact.linkedin_url`
   - `github.com/<username>` (profile root) -> `contact.github_url`
   - `github.com/<username>/<repo>` or live demo URL -> matching entry's `projects[].url` (and also `contact.github_url` if no profile root URL exists)
-  - Personal domain / portfolio site -> `contact.portfolio_url`
+  - Certificate verification URLs (e.g. `udemy.com/certificate/UC-...`, `coursera.org/verify/...`, `credly.com/...`) -> enrich the matching certification's `issuer` and `credential_id` (NEVER put certificate URLs in `contact.portfolio_url`).
+  - Candidate's personal website / portfolio domain -> `contact.portfolio_url`.
 </layout_and_link_handling>
 
 <extraction_protocol>
 Extract EVERY section exhaustively without skipping secondary items:
 1. Identity & Contact:
-   - `full_name`: Exact full name as printed (even if ALL CAPS or placed mid-header).
-   - `contact`: `email`, `phone`, `location`, `linkedin_url`, `github_url`, `portfolio_url`. Keep verbatim URLs; if an icon + bare GitHub/LinkedIn handle appears (e.g. `iamkiran2210` next to a GitHub symbol), only construct a URL if the platform is clearly indicated, and quote the exact handle text in `evidence`.
+   - `full_name`: Exact full name of the candidate (never a header like `"RESUME"` or `"CURRICULUM VITAE"`).
+   - `contact`: `email`, `phone` (never confuse year ranges like `2017 - 2021` with phone numbers), `location`, `linkedin_url`, `github_url`, `portfolio_url`. Always include `https://` for URLs. If an icon + bare GitHub/LinkedIn handle appears (e.g. `iamkiran2210` next to a GitHub symbol), only construct a URL if the platform is clearly indicated, and quote the exact handle text in `evidence`.
 2. Summary: Capture the stated Professional Summary / About Me / Career Objective concisely without inventing claims.
-3. Skills (HIGH RECALL):
+3. Skills (HIGH RECALL, CLEAN ATOMIC NAMES):
    - Scan the ENTIRE document: dedicated Skills/Tech Stack tables, Summary, Employment bullets, AND Project descriptions/tech stacks.
-   - Split comma-, pipe-, slash-, or bullet-separated lists into atomic entries (one skill per item, deduplicated case-insensitively).
-   - Assign a concise `category` when obvious (e.g. `language`, `framework`, `database`, `cloud`, `devops`, `ml`, `tool`) and copy a short exact verbatim phrase (10–120 chars) from `<document>` as `evidence`.
+   - Split comma-, pipe-, slash-, or bullet-separated lists into atomic entries (one skill per item, deduplicated case-insensitively; avoid emitting redundant version duplicates like both `"Python"` and `"Python 3"` unless distinct).
+   - Strip leading icons/category prefixes (`Languages:`, `</>`) and trailing proficiency words (`Expert`, `Intermediate`, `Native speaker`, `Highly proficient`) from `skill.name`.
+   - NEVER extract full work-bullet action sentences (e.g. `"Loaded and unloaded vehicles"`) or corrupted OCR gibberish as skills.
+   - Assign a concise `category` when obvious (`language`, `framework`, `database`, `cloud`, `devops`, `ml`, `tool`, `soft_skill`, `spoken_language`) and copy a short exact verbatim phrase (10–120 chars) from `<document>` as `evidence`.
 4. Employment (include full-time, part-time, internships, freelance, research/teaching assistantships):
-   - Emit one entry per distinct role with `company`, `title`, `location`, `start_date`, `end_date`, `is_current`, concise `description`, and key `highlights`.
-   - Normalize dates to `YYYY`, `YYYY-MM`, or `YYYY-MM-DD` (e.g. `Jan 2023` -> `2023-01`, `May 2021 - Present` -> `start_date="2021-05"`, `end_date=null`, `is_current=true`).
+   - Emit one entry per distinct role with clean `company` (no trailing commas), `title`, `location`, `start_date`, `end_date`, `is_current`, concise `description`, and key `highlights`.
+   - Normalize ALL date formats (`"Jan 2023"`, `"Jan / 2021"`, `"01/2021"`, `"2021"`) to `YYYY`, `YYYY-MM`, or `YYYY-MM-DD`. For `"Present"`, `"Ongoing"`, `"Current"`, `"Now"`, set `end_date=null` and `is_current=true`.
 5. Experience Claims:
    - Extract ONLY explicit numeric duration statements written in the resume (e.g. `"5+ years of Python"`, `"3 years building backend APIs"`). Set `area=null` for overall experience.
    - NEVER calculate, sum, or infer years from employment dates.
 6. Education (include college, university, high school/intermediate/SSC if listed):
-   - Extract `institution`, `degree` (preserving exact degree name such as `"B.Tech"`, `"Bachelor of Technology"`, `"M.S."`, `"Intermediate (MPC)"`), `field_of_study`, `start_date`, `end_date` (even for ongoing/pursuing degrees like `2023 - 2027`), and `grade` (e.g. `"CGPA: 9.05"`, `"9.77"`).
+   - Extract clean `institution` (strip trailing commas/punctuation), `degree` (`"B.Tech"`, `"Bachelor of Technology"`, `"B.Sc."`, `"M.S."`, `"Intermediate (MPC)"`), `field_of_study` (check BOTH the Education section AND header subtitles like `"B.Tech (Computer Science)"`), `start_date`, `end_date` (even for ongoing/pursuing degrees like `2023 - 2027`), and `grade` (e.g. `"CGPA: 9.05"`, `"GPA: 3.7/4.0"`).
 7. Projects (academic, personal, open-source, hackathon, capstone):
    - Extract `name`, `role`, concise `description`, `url` (from inline text or `[Embedded Links]`), and an atomic `technologies` list for every project mentioned.
 8. Certifications & Courses:
-   - Extract `name`, `issuer`, `issue_date`, `expiry_date`, and `credential_id` for every named certification or credential.
+   - Extract `name`, `issuer`, `issue_date`, `expiry_date`, and `credential_id` (checking `[Embedded Links]` when a certificate URL contains an ID like `UC-...`) for every named certification or credential.
 </extraction_protocol>
 
 <evidence_and_confidence_rules>
@@ -287,25 +294,25 @@ def _passthrough_wrap(text: str) -> str:
 
 RESUME_TASK = TaskSpec(
     name="resume_profile",
-    version="2026-11-v4",
+    version="2026-11-v5",
     output_type=ExtractedProfileData,
     instructions=RESUME_INSTRUCTIONS,
     preferred_engine="pydantic_ai",
     use_chain_of_thought=False,
     task_kind="extraction",
     tier="primary",
-    max_output_tokens=4096,
+    max_output_tokens=8192,
 )
 REQUIREMENTS_TASK = TaskSpec(
     name="job_requirements",
-    version="2026-11-v3",
+    version="2026-11-v4",
     output_type=JobRequirementSuggestions,
     instructions=REQUIREMENTS_INSTRUCTIONS,
     preferred_engine="pydantic_ai",
     use_chain_of_thought=False,
     task_kind="extraction",
     tier="fast",
-    max_output_tokens=2048,
+    max_output_tokens=4096,
 )
 RELEVANCE_TASK = TaskSpec(
     name="relevance_analysis",

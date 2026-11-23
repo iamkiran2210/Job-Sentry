@@ -24,28 +24,55 @@
     XCircle
   } from '@lucide/svelte';
 
+  function localIsoDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function daysAgoIso(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return localIsoDate(d);
+  }
+
+  let range = $state<'7d' | '30d' | '90d'>('30d');
   let phase = $state<'loading' | 'ready' | 'error'>('loading');
   let overview = $state<Record<string, unknown> | null>(null);
   let pipeline = $state<Record<string, unknown> | null>(null);
   let jobs = $state<Job[]>([]);
+  let loadSeq = 0;
 
   async function load() {
+    const seq = ++loadSeq;
     phase = 'loading';
+    const to = localIsoDate(new Date());
+    const from = range === '7d' ? daysAgoIso(6) : range === '30d' ? daysAgoIso(29) : daysAgoIso(89);
+    const interval: 'day' | 'week' = range === '90d' ? 'week' : 'day';
     try {
       const [ov, pipe, jobList] = await Promise.allSettled([
-        getOverview(),
-        getAnalytics('pipeline'),
+        getOverview({ from, to, interval }),
+        getAnalytics('pipeline', { from, to }),
         listJobs()
       ]);
+      if (seq !== loadSeq) return;
       if (ov.status === 'rejected') throw ov.reason;
       overview = isObj(ov.value) ? ov.value : null;
       pipeline = pipe.status === 'fulfilled' && isObj(pipe.value) ? pipe.value : null;
       jobs = jobList.status === 'fulfilled' ? jobList.value : [];
       phase = 'ready';
     } catch (e) {
+      if (seq !== loadSeq) return;
       phase = 'error';
       toastError(e, 'Could not load dashboard');
     }
+  }
+
+  function setRange(r: '7d' | '30d' | '90d') {
+    if (range === r) return;
+    range = r;
+    load();
   }
 
   load();
@@ -116,6 +143,19 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-2 shrink-0">
+      <div class="inline-flex items-center rounded-lg border border-border bg-muted/30 p-0.5">
+        {#each (['7d', '30d', '90d'] as const) as r}
+          <button
+            type="button"
+            onclick={() => setRange(r)}
+            class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+              range === r ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {r}
+          </button>
+        {/each}
+      </div>
       <Button size="sm" href="/jobs/new">
         <Plus class="mr-1.5 size-3.5" /> New job
       </Button>
